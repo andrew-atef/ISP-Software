@@ -15,9 +15,17 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('email')->unique();
+            $table->string('role')->default('tech'); // admin, dispatch, tech
+            $table->string('phone')->nullable();
+            $table->string('wire3_email')->nullable();
+            $table->string('job_title')->nullable();
+            $table->decimal('current_lat', 10, 8)->nullable();
+            $table->decimal('current_lng', 11, 8)->nullable();
+            $table->timestamp('last_seen_at')->nullable();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->rememberToken();
+            $table->softDeletes();
             $table->timestamps();
         });
 
