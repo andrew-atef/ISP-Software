@@ -23,6 +23,10 @@ class LoansRelationManager extends RelationManager
     {
         return $schema
             ->components([
+                Forms\Components\DatePicker::make('start_date')
+                    ->label('First Deduction Date')
+                    ->required()
+                    ->default(now()),
                 Forms\Components\TextInput::make('amount_total')
                     ->label('Total Amount')
                     ->required()

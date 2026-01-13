@@ -12,6 +12,7 @@ class Loan extends Model
 
     protected $fillable = [
         'user_id',
+        'start_date',
         'amount_total',
         'installments_count',
         'installment_amount',
@@ -20,6 +21,7 @@ class Loan extends Model
     ];
 
     protected $casts = [
+        'start_date' => 'date',
         'amount_total' => 'decimal:2',
         'installment_amount' => 'decimal:2',
         'status' => LoanStatus::class,
@@ -46,12 +48,11 @@ class Loan extends Model
     {
         // Automatically generate rows in loan_installments table
         // e.g., $100 loan paid over 4 weeks = $25/week deduction.
-        // Assuming weekly installments starting next week or immediate? Prompt didn't specify start date logic.
-        // I'll assume starting 1 week from creation for simplicity.
+        // Start date is now explicit, fallback to today if missing (though form requires it).
 
-        $startDate = now();
+        $startDate = $this->start_date ? \Carbon\Carbon::parse($this->start_date) : now();
 
-        for ($i = 1; $i <= $this->installments_count; $i++) {
+        for ($i = 0; $i < $this->installments_count; $i++) {
             $this->installments()->create([
                 'amount' => $this->installment_amount,
                 'due_date' => $startDate->copy()->addWeeks($i),

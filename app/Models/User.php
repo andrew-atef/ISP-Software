@@ -88,7 +88,7 @@ class User extends Authenticatable
 
     public function getCurrentWeekEarningsAttribute(): float
     {
-        $start = \Carbon\Carbon::now()->startOfWeek();
+        $start = \Carbon\Carbon::now()->startOfWeek(\Carbon\Carbon::SUNDAY);
         return $this->tasks()
             ->where('status', \App\Enums\TaskStatus::Approved)
             ->where('completion_date', '>=', $start)

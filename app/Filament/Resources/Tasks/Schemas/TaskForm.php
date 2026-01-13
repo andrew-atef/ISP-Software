@@ -2,9 +2,11 @@
 
 namespace App\Filament\Resources\Tasks\Schemas;
 
+
 use App\Enums\TaskFinancialStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
+use \App\Models\JobPrice;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -19,45 +21,72 @@ class TaskForm
         return $schema
             ->columns(2)
             ->components([
-                // Section 1: Customer & Schedule
-                Section::make('Customer & Schedule')
+                // Section 1: Customer Details
+                Section::make('Customer Details')
                     ->columnSpanFull()
                     ->columns(2)
                     ->schema([
-                        Select::make('customer_id')
-                            ->relationship('customer', 'name')
-                            ->searchable()
-                            ->preload()
+                        TextInput::make('wire3_cid')
+                            ->label('Wire3 CID')
                             ->required(),
+                        TextInput::make('customer_name')
+                            ->label('Customer Name')
+                            ->required(),
+                        TextInput::make('customer_phone')
+                            ->label('Phone Number')
+                            ->tel(),
+                        TextInput::make('customer_address')
+                            ->label('Address')
+                            ->required()
+                            ->columnSpanFull(),
+                    ]),
+
+                // Section 2: Schedule & Assignment
+                Section::make('Schedule & Assignment')
+                    ->columnSpanFull()
+                    ->columns(3)
+                    ->schema([
                         DatePicker::make('scheduled_date')
+                            ->default(now()->addDay())
                             ->required(),
                         TimePicker::make('time_slot_start')
                             ->seconds(false),
                         TimePicker::make('time_slot_end')
                             ->seconds(false),
-                    ]),
-
-                // Section 2: Assignment & Type
-                Section::make('Assignment & Type')
-                    ->columnSpanFull()
-                    ->columns(3)
-                    ->schema([
+                        
                         Select::make('original_tech_id')
                             ->label('Original Tech (Wire3)')
                             ->relationship('originalTech', 'name')
                             ->searchable()
-                            ->preload(),
-                        Select::make('assigned_tech_id')
-                            ->relationship('assignedTech', 'name')
-                            ->searchable()
                             ->preload()
                             ->required(),
+                        
+                        Select::make('assigned_tech_id')
+                            ->relationship('assignedTech', 'name', fn ($query) => $query->where('role', \App\Enums\UserRole::Tech))
+                            ->searchable()
+                            ->preload()
+                            ->live()
+                            ->afterStateUpdated(fn ($state, $set) => 
+                                $state ? $set('status', TaskStatus::Assigned) : $set('status', TaskStatus::Pending)
+                            ),
+
                         Select::make('task_type')
                             ->options(TaskType::class)
-                            ->required(),
+                            ->default(TaskType::NewInstall)
+                            ->required()
+                            ->live()
+                            ->afterStateUpdated(function ($get, $set) {
+                                self::updatePricing($get, $set);
+                            })
+                            ->afterStateHydrated(function ($get, $set) {
+                                self::updatePricing($get, $set);
+                            }),
+
                         Select::make('status')
                             ->options(TaskStatus::class)
                             ->default(TaskStatus::Pending)
+                            ->disabled()
+                            ->dehydrated()
                             ->required(),
                     ]),
 
@@ -68,21 +97,58 @@ class TaskForm
                     ->schema([
                         Select::make('financial_status')
                             ->options(TaskFinancialStatus::class)
-                            ->default(TaskFinancialStatus::NotBillable)
-                            ->required(),
+                            ->default(TaskFinancialStatus::Billable)
+                            ->required()
+                            ->live()
+                            ->afterStateUpdated(function ($state, $get, $set) {
+                                self::updatePricing($get, $set);
+                            }),
                         TextInput::make('company_price')
                             ->label('Company Price (Wire3)')
                             ->numeric()
                             ->prefix('$')
-                            ->default(0.00)
+                            ->default(fn () => JobPrice::where('task_type', TaskType::NewInstall)->first()?->company_price ?? 0)
                             ->required(),
                         TextInput::make('tech_price')
                             ->label('Tech Price')
                             ->numeric()
                             ->prefix('$')
-                            ->default(0.00)
+                            ->default(fn () => JobPrice::where('task_type', TaskType::NewInstall)->first()?->tech_price ?? 0)
                             ->required(),
                     ]),
             ]);
+    }
+
+    public static function updatePricing($get, $set): void
+    {
+        $taskType = $get('task_type');
+        $financialStatus = $get('financial_status');
+
+        if (! $taskType) {
+            return;
+        }
+
+        // Handle Enum vs String
+        $typeValue = $taskType instanceof TaskType ? $taskType->value : $taskType;
+        $financialStatusValue = $financialStatus instanceof TaskFinancialStatus ? $financialStatus->value : $financialStatus;
+
+        // Fetch Base Prices from DB
+        $jobPrice = \App\Models\JobPrice::where('task_type', $typeValue)->first();
+
+        // Default to 0 if not found
+        $baseCompanyPrice = $jobPrice ? $jobPrice->company_price : 0;
+        $baseTechPrice = $jobPrice ? $jobPrice->tech_price : 0;
+
+        // Apply Override Logic
+        // If NotBillable -> Force company_price to 0 (Keep tech_price as Base).
+        // Else -> Set company_price to Base.
+        
+        if ($financialStatusValue === TaskFinancialStatus::NotBillable->value) {
+            $set('company_price', 0);
+        } else {
+            $set('company_price', $baseCompanyPrice);
+        }
+
+        $set('tech_price', $baseTechPrice);
     }
 }

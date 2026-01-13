@@ -171,7 +171,7 @@ class TechnicianResource extends Resource
                                     ->state(
                                         fn(User $record) => $record->tasks()
                                             ->where('status', \App\Enums\TaskStatus::Completed)
-                                            ->where('completion_date', '>=', \Carbon\Carbon::now()->startOfWeek())
+                                            ->where('completion_date', '>=', \Carbon\Carbon::now()->startOfWeek(\Carbon\Carbon::SUNDAY))
                                             ->count()
                                     ),
                             ]),
@@ -183,7 +183,9 @@ class TechnicianResource extends Resource
                             ->schema([
                                 TextEntry::make('balance')
                                     ->label('Total Unpaid Loans')
-                                    ->state(fn(User $record) => $record->loans()->sum('amount_total')) // Assuming amount column
+                                    ->state(fn(User $record) => \App\Models\LoanInstallment::whereHas('loan', function ($q) use ($record) {
+                                        $q->where('user_id', $record->id);
+                                    })->where('is_paid', false)->sum('amount'))
                                     ->color('danger')
                                     ->money('USD'),
                                 TextEntry::make('performance')

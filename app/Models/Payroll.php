@@ -16,14 +16,18 @@ class Payroll extends Model
         'week_number',
         'year',
         'gross_amount',
+        'bonus_amount',
         'deductions_amount',
+        'deduction_override',
         'net_pay',
         'status',
     ];
 
     protected $casts = [
         'gross_amount' => 'decimal:2',
+        'bonus_amount' => 'decimal:2',
         'deductions_amount' => 'decimal:2',
+        'deduction_override' => 'decimal:2',
         'net_pay' => 'decimal:2',
         'status' => PayrollStatus::class,
     ];
@@ -43,15 +47,18 @@ class Payroll extends Model
         // 1. Determine Week Range based on stored week_number/year
         // ISO-8601 weeks start on Monday. Adjust if business needs Sunday.
         // Assuming Carbon's default startOfWeek() (Monday) for now.
-        $start = Carbon::now()->setISODate($this->year, $this->week_number)->startOfWeek();
-        $end = $start->copy()->endOfWeek();
+        $start = Carbon::now()->setISODate($this->year, $this->week_number)->startOfWeek(Carbon::SUNDAY);
+        $end = $start->copy()->endOfWeek(Carbon::SATURDAY);
 
         // 2. Gross Earnings from Tasks
         // Sum tech_price of tasks completed in this window
-        $gross = Task::where('assigned_tech_id', $this->user_id)
+        $tasksTotal = Task::where('assigned_tech_id', $this->user_id)
             ->where('status', \App\Enums\TaskStatus::Approved)
             ->whereBetween('completion_date', [$start, $end])
             ->sum('tech_price');
+
+        // Apply Bonus
+        $gross = $tasksTotal + ($this->bonus_amount ?? 0);
 
         // 3. Deductions from Loans
         // Find installments due this week, not yet assigned to ANOTHER payroll (or assigned to this one)
@@ -65,7 +72,10 @@ class Payroll extends Model
             })
             ->get();
 
-        $deductions = $installments->sum('amount');
+        $systemDeductions = $installments->sum('amount');
+
+        // Apply Override if set
+        $finalDeductions = $this->deduction_override ?? $systemDeductions;
 
         // Link these installments to this payroll record
         foreach ($installments as $installment) {
@@ -73,10 +83,10 @@ class Payroll extends Model
         }
 
         // 4. Update Totals
-        $this->update([
+        $this->updateQuietly([
             'gross_amount' => $gross,
-            'deductions_amount' => $deductions,
-            'net_pay' => $gross - $deductions,
+            'deductions_amount' => $finalDeductions,
+            'net_pay' => $gross - $finalDeductions,
         ]);
     }
 }
