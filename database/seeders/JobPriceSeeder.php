@@ -25,13 +25,13 @@ class JobPriceSeeder extends Seeder
             ],
             [
                 'task_type' => \App\Enums\TaskType::ServiceCall,
-                'company_price' => 0.00,
-                'tech_price' => 0.00,
+                'company_price' => 50.00,
+                'tech_price' => 10.00,
             ],
             [
                 'task_type' => \App\Enums\TaskType::ServiceChange,
-                'company_price' => 0.00,
-                'tech_price' => 0.00,
+                'company_price' => 50.00,
+                'tech_price' => 10.00,
             ],
         ];
 

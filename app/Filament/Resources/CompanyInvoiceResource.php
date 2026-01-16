@@ -26,6 +26,7 @@ class CompanyInvoiceResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema
+            ->columns(2)
             ->components([
                 Forms\Components\TextInput::make('invoice_number')
                     ->disabled()
@@ -33,49 +34,48 @@ class CompanyInvoiceResource extends Resource
                     ->placeholder('Auto-generated')
                     ->columnSpanFull(),
 
-                Forms\Components\Grid::make(2)
-                    ->schema([
-                        Forms\Components\TextInput::make('year')
-                            ->label('Year')
-                            ->numeric()
-                            ->required()
-                            ->default(now()->year)
-                            ->live()
-                            ->dehydrated(false)
-                            ->afterStateHydrated(function (Forms\Components\TextInput $component, ?Model $record) {
-                                if ($record && $record->period_start) {
-                                    $component->state($record->period_start->year);
-                                }
-                            })
-                            ->afterStateUpdated(function (Get $get, Set $set) {
-                                self::updatePeriodDates($get, $set);
-                            }),
+                Forms\Components\TextInput::make('year')
+                    ->label('Year')
+                    ->numeric()
+                    ->required()
+                    ->default(now()->year)
+                    ->live()
+                    ->dehydrated(false)
+                    ->afterStateHydrated(function (Forms\Components\TextInput $component, ?Model $record) {
+                        if ($record && $record->period_start) {
+                            $component->state($record->period_start->year);
+                        }
+                    })
+                    ->afterStateUpdated(function (Get $get, Set $set) {
+                        self::updatePeriodDates($get, $set);
+                    })
+                    ->columnSpan(1),
 
-                        Forms\Components\TextInput::make('week_number')
-                            ->label('Week Number')
-                            ->numeric()
-                            ->required()
-                            ->minValue(1)
-                            ->maxValue(53)
-                            ->live()
-                            ->afterStateUpdated(function (Get $get, Set $set) {
-                                self::updatePeriodDates($get, $set);
-                            }),
-                    ]),
+                Forms\Components\TextInput::make('week_number')
+                    ->label('Week Number')
+                    ->numeric()
+                    ->required()
+                    ->minValue(1)
+                    ->maxValue(53)
+                    ->live()
+                    ->afterStateUpdated(function (Get $get, Set $set) {
+                        self::updatePeriodDates($get, $set);
+                    })
+                    ->columnSpan(1),
 
-                Forms\Components\Grid::make(2)
-                    ->schema([
-                        Forms\Components\DatePicker::make('period_start')
-                            ->label('Period Start')
-                            ->disabled()
-                            ->dehydrated()
-                            ->required(),
-                        Forms\Components\DatePicker::make('period_end')
-                            ->label('Period End')
-                            ->disabled()
-                            ->dehydrated()
-                            ->required(),
-                    ]),
+                Forms\Components\DatePicker::make('period_start')
+                    ->label('Period Start')
+                    ->disabled()
+                    ->dehydrated()
+                    ->required()
+                    ->columnSpan(1),
+
+                Forms\Components\DatePicker::make('period_end')
+                    ->label('Period End')
+                    ->disabled()
+                    ->dehydrated()
+                    ->required()
+                    ->columnSpan(1),
 
                 Forms\Components\TextInput::make('total_amount')
                     ->prefix('$')

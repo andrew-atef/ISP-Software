@@ -50,6 +50,14 @@ class TaskInfolist
                                     ->label('Phone')
                                     ->icon('heroicon-o-phone')
                                     ->copyable(),
+                                TextEntry::make('assignedTech.name')
+                                    ->label('Assigned Technician')
+                                    ->icon('heroicon-o-user')
+                                    ->weight('bold')
+                                    ->color('primary')
+                                    ->placeholder('Unassigned')
+                                    ->badge()
+                                    ->color(fn($state): string => $state ? 'success' : 'gray'),
                                 TextEntry::make('scheduled_date')
                                     ->label('Scheduled Date')
                                     ->date()

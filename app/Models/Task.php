@@ -100,7 +100,7 @@ class Task extends Model
 
     /**
      * Returns the tech payment for this task.
-     * 
+     *
      * This method strictly returns the stored tech_price snapshot from the DB.
      * It does NOT calculate anything - it preserves historical financial accuracy.
      *

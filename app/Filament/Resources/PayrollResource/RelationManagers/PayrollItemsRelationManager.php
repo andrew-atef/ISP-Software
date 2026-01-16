@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\PayrollResource\RelationManagers;
 
+use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\Task;
 use Filament\Actions\ViewAction;
@@ -20,6 +21,7 @@ class PayrollItemsRelationManager extends RelationManager
     {
         return $table
             ->recordTitleAttribute('description')
+            ->modifyQueryUsing(fn (Builder $query) => $query->where('status', TaskStatus::Approved))
             ->columns([
                 Tables\Columns\TextColumn::make('task_type')
                     ->label('Task Type')

@@ -20,11 +20,11 @@ use Illuminate\Database\Eloquent\Builder;
 class GeneratePayroll extends Page implements HasForms
 {
     use InteractsWithForms;
-    
+
     protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-currency-dollar';
     protected static string | \UnitEnum | null $navigationGroup = 'Financial';
     protected static ?int $navigationSort = 1;
-    
+
     protected string $view = 'filament.pages.payroll.generate-payroll';
 
     public ?array $data = [];
@@ -122,12 +122,10 @@ class GeneratePayroll extends Page implements HasForms
             // Process each technician
             foreach ($technicians as $technician) {
                 // Fetch payable tasks (not yet paid)
+                // BUSINESS RULE: Only Approved tasks (passed QC) are payable
                 $tasks = Task::query()
                     ->where('assigned_tech_id', $technician->id)
-                    ->where(fn(Builder $q) =>
-                        $q->where('status', TaskStatus::Approved->value)
-                            ->orWhere('status', TaskStatus::Completed->value)
-                    )
+                    ->where('status', TaskStatus::Approved)
                     ->where('tech_price', '>', 0)
                     ->whereNull('payroll_id')
                     ->whereBetween('completion_date', [$weekStart, $weekEnd])

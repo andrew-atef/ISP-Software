@@ -50,7 +50,7 @@ class Payroll extends Model
 
     /**
      * Get precise week date range.
-     * 
+     *
      * FIX #2: Centralized date precision logic.
      * Uses startOfDay/endOfDay for exact boundaries.
      */
@@ -70,21 +70,23 @@ class Payroll extends Model
 
     /**
      * Recalculate payroll financials from linked tasks and loan installments.
-     * 
+     *
      * This method re-sums all linked tasks (tech_price) and loan installments (amount)
      * to compute Gross, Deductions, and Net Pay amounts.
-     * 
+     *
      * Mathematical breakdown:
-     * - gross_amount = sum of all linked tasks' tech_price
+     * - gross_amount = sum of all linked tasks' tech_price (ONLY Approved status)
      * - deductions_amount = sum of all linked loan installments' amount (or deduction_override if set)
      * - net_pay = gross_amount + bonus_amount - deductions_amount
-     * 
+     *
+     * BUSINESS RULE: Only Approved tasks (passed QC) are payable.
      * This is a WRITE operation that updates this Payroll record's financial totals.
      */
     public function recalculate(): void
     {
-        // Sum tech_price from all linked tasks (Payable regardless of financial_status)
+        // Sum tech_price from all linked tasks that are Approved (passed QC)
         $grossAmount = $this->tasks()
+            ->where('status', TaskStatus::Approved)
             ->sum('tech_price');
 
         // Sum amount from all linked loan installments

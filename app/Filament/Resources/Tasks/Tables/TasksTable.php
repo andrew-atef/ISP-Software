@@ -2,10 +2,12 @@
 
 namespace App\Filament\Resources\Tasks\Tables;
 
+use App\Enums\UserRole;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\User;
 use Filament\Actions\BulkAction;
+use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -14,6 +16,7 @@ use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -29,6 +32,7 @@ class TasksTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn (Builder $query) => $query->with(['customer', 'assignedTech']))
             ->columns([
                 TextColumn::make('customer.wire3_cid')
                     ->label('Wire3 CID')
@@ -45,7 +49,35 @@ class TasksTable
                     ->toggleable(),
                 TextColumn::make('assignedTech.name')
                     ->label('Technician')
-                    ->searchable(),
+                    ->placeholder('Assign Tech')
+                    ->icon(fn ($record) => $record->status === TaskStatus::Pending ? 'heroicon-m-user-plus' : 'heroicon-m-user')
+                    ->color(fn ($record) => $record->status === TaskStatus::Pending ? 'primary' : 'gray')
+                    ->weight(fn ($record) => $record->status === TaskStatus::Pending ? 'bold' : 'normal')
+                    ->action(
+                        Action::make('assignTech')
+                            ->icon('heroicon-o-user-plus')
+                            ->color('primary')
+                            ->tooltip('Assign Technician')
+                            ->visible(fn ($record) => $record->status === TaskStatus::Pending)
+                            ->requiresConfirmation()
+                            ->form([
+                                Select::make('assigned_tech_id')
+                                    ->label('Assign To')
+                                    ->options(fn (): array => User::query()
+                                        ->where('role', UserRole::Tech)
+                                        ->orderBy('name')
+                                        ->pluck('name', 'id')
+                                        ->toArray())
+                                    ->searchable()
+                                    ->required(),
+                            ])
+                            ->action(function ($record, array $data) {
+                                $record->update([
+                                    'assigned_tech_id' => $data['assigned_tech_id'] ?? null,
+                                    'status' => TaskStatus::Assigned,
+                                ]);
+                            })
+                    ),
                 TextColumn::make('task_type')
                     ->badge()
                     ->color(fn(TaskType $state): string => match ($state) {
@@ -66,6 +98,11 @@ class TasksTable
                 TextColumn::make('scheduled_date')
                     ->date()
                     ->sortable(),
+                TextColumn::make('completion_date')
+                    ->label('Completed')
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable(),
                 IconColumn::make('is_offline_sync')
                     ->label('Offline')
                     ->boolean()
@@ -75,6 +112,11 @@ class TasksTable
                     ->falseColor('gray'),
                 TextColumn::make('financial_status')
                     ->badge(),
+                TextColumn::make('tech_price')
+                    ->label('Tech Pay')
+                    ->money('USD')
+                    ->sortable()
+                    ->toggleable(),
             ])
             ->filters([
                 SelectFilter::make('status')
@@ -107,7 +149,37 @@ class TasksTable
             ])
             ->deferFilters(false)
             ->recordActions([
-                ViewAction::make(),
+                ViewAction::make()
+                    ->color('gray'),
+                Action::make('approve')
+                    ->label('Approve Job')
+                    ->icon('heroicon-o-check')
+                    ->color('success')
+                    ->tooltip('Approve & Bill')
+                    ->requiresConfirmation()
+                    ->visible(fn ($record) => $record->status === TaskStatus::Completed)
+                    ->action(fn ($record) => $record->update(['status' => TaskStatus::Approved])),
+                Action::make('returnForFix')
+                    ->label('Return for Fix')
+                    ->icon('heroicon-o-arrow-uturn-left')
+                    ->color('danger')
+                    ->visible(fn ($record) => $record->status === TaskStatus::Completed)
+                    ->form([
+                        Textarea::make('reason')
+                            ->label('Reason')
+                            ->required()
+                            ->rows(3),
+                    ])
+                    ->action(function ($record, array $data) {
+                        $reason = trim($data['reason'] ?? '');
+                        $prefix = '[QC Return] ';
+                        $timestamp = now()->toDateTimeString();
+                        $desc = trim(($record->description ? ($record->description . "\n") : '') . $prefix . $reason . " ({$timestamp})");
+                        $record->update([
+                            'status' => TaskStatus::ReturnedForFix,
+                            'description' => $desc,
+                        ]);
+                    }),
                 EditAction::make(),
             ])
             ->toolbarActions([
