@@ -6,13 +6,14 @@ use App\Enums\TaskType;
 use App\Filament\Resources\JobPriceResource\Pages;
 use App\Models\JobPrice;
 use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 class JobPriceResource extends Resource
 {
@@ -27,17 +28,34 @@ class JobPriceResource extends Resource
         return $schema
             ->components([
                 Forms\Components\Select::make('task_type')
-                    ->options(TaskType::class)
+                    ->options(function (?Model $record) {
+                        // Get all task types that exist in database
+                        // But if we're editing, exclude the current record from the count
+                        $takenTypes = JobPrice::query()
+                            ->when($record, fn($q) => $q->where('id', '!=', $record->id))
+                            ->pluck('task_type')
+                            ->map(fn($v) => $v instanceof TaskType ? $v->value : $v)
+                            ->toArray();
+
+                        // Return only task types that are not taken
+                        return collect(TaskType::cases())
+                            ->filter(fn(TaskType $t) => !in_array($t->value, $takenTypes))
+                            ->mapWithKeys(fn(TaskType $t) => [$t->value => $t->getLabel()])
+                            ->toArray();
+                    })
                     ->required()
-                    ->unique(ignoreRecord: true),
+                    ->unique(ignoreRecord: true)
+                    ->disabled(fn(string $context): bool => $context === 'edit'),
                 Forms\Components\TextInput::make('company_price')
                     ->required()
                     ->numeric()
+                    ->minValue(0)
                     ->prefix('$')
                     ->default(0),
                 Forms\Components\TextInput::make('tech_price')
                     ->required()
                     ->numeric()
+                    ->minValue(0)
                     ->prefix('$')
                     ->default(0),
             ]);
@@ -68,12 +86,13 @@ class JobPriceResource extends Resource
             ->filters([
                 //
             ])
+            ->paginated(false)
             ->actions([
                 EditAction::make(),
             ])
             ->bulkActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    // DeleteBulkAction intentionally removed - pricing rules cannot be deleted
                 ]),
             ]);
     }
@@ -92,5 +111,19 @@ class JobPriceResource extends Resource
             'create' => Pages\CreateJobPrice::route('/create'),
             'edit' => Pages\EditJobPrice::route('/{record}/edit'),
         ];
+    }
+
+    /**
+     * Prevent creation when all TaskType cases are already defined.
+     *
+     * This ensures the "Create" button only appears when there are
+     * pricing rules still to be added.
+     */
+    public static function canCreate(): bool
+    {
+        $existingCount = JobPrice::query()->count();
+        $enumCasesCount = count(TaskType::cases());
+
+        return $existingCount < $enumCasesCount;
     }
 }

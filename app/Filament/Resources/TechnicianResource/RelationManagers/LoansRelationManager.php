@@ -2,6 +2,9 @@
 
 namespace App\Filament\Resources\TechnicianResource\RelationManagers;
 
+use App\Models\Loan;
+use App\Models\LoanInstallment;
+use Carbon\Carbon;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;

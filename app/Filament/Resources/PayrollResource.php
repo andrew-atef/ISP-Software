@@ -4,19 +4,16 @@ namespace App\Filament\Resources;
 
 use App\Enums\PayrollStatus;
 use App\Filament\Resources\PayrollResource\Pages;
+use App\Filament\Resources\PayrollResource\RelationManagers;
 use App\Models\Payroll;
+use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms;
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Grid;
-use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Components\Utilities\Set;
-use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -25,186 +22,93 @@ class PayrollResource extends Resource
 {
     protected static ?string $model = Payroll::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-banknotes';
-
-    protected static string|\UnitEnum|null $navigationGroup = 'Financial';
-
-    protected static ?int $navigationSort = 10;
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-banknotes';
+    protected static string | \UnitEnum | null $navigationGroup = 'Financial';
+    protected static ?int $navigationSort = 2;
 
     public static function form(Schema $schema): Schema
     {
         return $schema
             ->components([
-                Section::make('Technician & Period')
-                    ->columns(2)
-                    ->schema([
-                        Forms\Components\Select::make('user_id')
-                            ->relationship('user', 'name')
-                            ->required()
-                            ->searchable()
-                            ->preload()
-                            ->disabled(fn ($record) => $record !== null) // Disabled on edit
-                            ->live()
-                            ->afterStateUpdated(function (Get $get, Set $set, $state, ?Payroll $record) {
-                                self::calculatePayroll($get, $set, $state, $record?->id);
-                            }),
-                        
-                        Grid::make(2)
-                            ->schema([
-                                Forms\Components\TextInput::make('week_number')
-                                    ->required()
-                                    ->numeric()
-                                    ->live(debounce: 500)
-                                    ->afterStateHydrated(function (Get $get, Set $set, $record) {
-                                        $userId = $get('user_id') ?? $record?->user_id;
-                                        if ($userId) {
-                                            self::calculatePayroll($get, $set, $userId, $record?->id);
-                                        }
-                                    })
-                                    ->afterStateUpdated(function (Get $get, Set $set, $state, ?Payroll $record) {
-                                        self::calculatePayroll($get, $set, $get('user_id'), $record?->id);
-                                    }),
-                                Forms\Components\TextInput::make('year')
-                                    ->required()
-                                    ->numeric()
-                                    ->default(now()->year)
-                                    ->live(debounce: 500)
-                                    ->afterStateUpdated(function (Get $get, Set $set, $state, ?Payroll $record) {
-                                        self::calculatePayroll($get, $set, $get('user_id'), $record?->id);
-                                    }),
-                            ]),
-                        
-                        Forms\Components\Select::make('status')
-                            ->options(PayrollStatus::class)
-                            ->required()
-                            ->default(PayrollStatus::Draft),
-                    ]),
+                Forms\Components\Select::make('user_id')
+                    ->label('Technician')
+                    ->options(
+                        User::where('role', 'Tech')
+                            ->orderBy('name')
+                            ->pluck('name', 'id')
+                            ->toArray()
+                    )
+                    ->required()
+                    ->searchable()
+                    ->columnSpan(1),
 
-                Section::make('Earnings Breakdown')
-                    ->columns(3)
-                    ->schema([
-                        Forms\Components\TextInput::make('tasks_total')
-                            ->label('Tasks Total')
-                            ->disabled()
-                            ->dehydrated(false)
-                            ->numeric()
-                            ->prefix('$'),
+                Forms\Components\Select::make('status')
+                    ->options(PayrollStatus::class)
+                    ->required()
+                    ->default(PayrollStatus::Draft)
+                    ->columnSpan(1),
 
-                        Forms\Components\TextInput::make('bonus_amount')
-                            ->label('Bonus / Adjustment (+)')
-                            ->numeric()
-                            ->default(0)
-                            ->dehydrateStateUsing(fn ($state) => $state ?? 0)
-                            ->live(debounce: 500)
-                            ->afterStateUpdated(function (Get $get, Set $set, $state) {
-                                self::updateCalculations($get, $set);
-                            }),
+                Forms\Components\TextInput::make('year')
+                    ->numeric()
+                    ->required()
+                    ->minValue(2020)
+                    ->maxValue(2099)
+                    ->columnSpan(1),
 
-                        Forms\Components\TextInput::make('gross_amount')
-                            ->label('Final Gross Amount')
-                            ->disabled()
-                            ->dehydrated() // Save this to DB
-                            ->numeric()
-                            ->prefix('$'),
-                    ]),
+                Forms\Components\TextInput::make('week_number')
+                    ->numeric()
+                    ->required()
+                    ->minValue(1)
+                    ->maxValue(53)
+                    ->columnSpan(1),
 
-                Section::make('Deductions')
-                    ->columns(2)
-                    ->schema([
-                        Forms\Components\TextInput::make('system_calculated_deduction')
-                            ->label('Scheduled Loan Deduction')
-                            ->disabled()
-                            ->dehydrated(false)
-                            ->numeric()
-                            ->prefix('$')
-                            ->hint('Based on active loans due this week'),
+                Forms\Components\TextInput::make('gross_amount')
+                    ->label('Gross Amount')
+                    ->numeric()
+                    ->prefix('$')
+                    ->default(0)
+                    ->disabled()
+                    ->dehydrated(false)
+                    ->helperText('Calculated from linked tasks')
+                    ->columnSpan(1),
 
-                        Forms\Components\TextInput::make('deduction_override')
-                            ->label('Loan Deduction Override (-)')
-                            ->helperText('Enter a value here to override the scheduled deduction.')
-                            ->numeric()
-                            ->nullable()
-                            ->live(debounce: 500)
-                            ->afterStateUpdated(function (Get $get, Set $set, $state) {
-                                self::updateCalculations($get, $set);
-                            }),
-                        
-                        Forms\Components\Hidden::make('deductions_amount')
-                            ->dehydrated(),
-                    ]),
+                Forms\Components\TextInput::make('bonus_amount')
+                    ->label('Bonus Amount')
+                    ->numeric()
+                    ->prefix('$')
+                    ->default(0)
+                    ->columnSpan(1),
 
-                Section::make('Final')
-                    ->schema([
-                        Forms\Components\TextInput::make('net_pay')
-                            ->label('Net Pay')
-                            ->disabled()
-                            ->dehydrated()
-                            ->numeric()
-                            ->prefix('$')
-                            ->extraInputAttributes(['style' => 'font-size: 1.5rem; font-weight: bold;']),
-                    ]),
-            ]);
-    }
+                Forms\Components\TextInput::make('deductions_amount')
+                    ->label('Calculated Deductions')
+                    ->numeric()
+                    ->prefix('$')
+                    ->default(0)
+                    ->disabled()
+                    ->dehydrated(false)
+                    ->helperText('Calculated from loan installments')
+                    ->columnSpan(1),
 
-    protected static function calculatePayroll(Get $get, Set $set, $userId, $currentPayrollId = null): void
-    {
-        $week = $get('week_number');
-        $year = $get('year');
+                Forms\Components\TextInput::make('deduction_override')
+                    ->label('Deduction Override')
+                    ->numeric()
+                    ->prefix('$')
+                    ->nullable()
+                    ->helperText('Optional: Override calculated deductions')
+                    ->columnSpan(1),
 
-        if (! $week || ! $year || ! $userId) {
-            return;
-        }
-
-        // 1. Calculate Tasks Total
-        try {
-            $start = \Carbon\Carbon::now()->setISODate($year, $week)->startOfWeek(\Carbon\Carbon::SUNDAY);
-            $end = $start->copy()->endOfWeek(\Carbon\Carbon::SATURDAY);
-
-            $tasksTotal = \App\Models\Task::where('assigned_tech_id', $userId)
-                ->where('status', \App\Enums\TaskStatus::Approved)
-                ->whereBetween('completion_date', [$start, $end])
-                ->sum('tech_price');
-            
-            $set('tasks_total', $tasksTotal);
-
-            // 2. Calculate System Deductions
-            $installments = \App\Models\LoanInstallment::whereHas('loan', function ($q) use ($userId) {
-                $q->where('user_id', $userId);
-            })
-                ->whereBetween('due_date', [$start->toDateString(), $end->toDateString()])
-                ->where(function ($q) use ($currentPayrollId) {
-                    $q->whereNull('payroll_id');
-                    if ($currentPayrollId) {
-                        $q->orWhere('payroll_id', $currentPayrollId);
-                    }
-                })
-                ->get();
-            
-            $systemDeductions = $installments->sum('amount');
-            $set('system_calculated_deduction', $systemDeductions);
-
-            self::updateCalculations($get, $set);
-
-        } catch (\Exception $e) {
-            // Invalid date/week
-        }
-    }
-
-    protected static function updateCalculations(Get $get, Set $set): void
-    {
-        $tasksTotal = (float) $get('tasks_total');
-        $bonus = (float) $get('bonus_amount');
-        
-        $gross = $tasksTotal + $bonus;
-        $set('gross_amount', $gross);
-
-        $systemDeductions = (float) $get('system_calculated_deduction');
-        $override = $get('deduction_override');
-        
-        $finalDeduction = ($override !== null && $override !== '') ? (float) $override : $systemDeductions;
-        
-        $set('deductions_amount', $finalDeduction);
-        $set('net_pay', $gross - $finalDeduction);
+                Forms\Components\TextInput::make('net_pay')
+                    ->label('Net Pay')
+                    ->numeric()
+                    ->prefix('$')
+                    ->default(0)
+                    ->disabled()
+                    ->dehydrated(false)
+                    ->columnSpanFull()
+                    ->extraAttributes(['class' => 'font-bold text-lg'])
+                    ->helperText('Gross + Bonus - Deductions'),
+            ])
+            ->columns(2);
     }
 
     public static function table(Table $table): Table
@@ -215,85 +119,98 @@ class PayrollResource extends Resource
                     ->label('Technician')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('period')
-                    ->label('Period')
-                    ->state(fn(Payroll $record) => "W{$record->week_number} - {$record->year}")
-                    ->sortable(['year', 'week_number']),
-                Tables\Columns\TextColumn::make('net_pay')
+
+                Tables\Columns\TextColumn::make('year')
+                    ->sortable()
+                    ->searchable(),
+
+                Tables\Columns\TextColumn::make('week_number')
+                    ->label('Week')
+                    ->sortable(),
+
+                Tables\Columns\TextColumn::make('status')
+                    ->badge()
+                    ->sortable(),
+
+                Tables\Columns\TextColumn::make('gross_amount')
+                    ->label('Gross')
                     ->money('USD')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('status')
-                    ->badge(),
+
+                Tables\Columns\TextColumn::make('bonus_amount')
+                    ->label('Bonus')
+                    ->money('USD')
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                Tables\Columns\TextColumn::make('deductions_amount')
+                    ->label('Deductions')
+                    ->money('USD')
+                    ->sortable(),
+
+                Tables\Columns\TextColumn::make('net_pay')
+                    ->label('Net Pay')
+                    ->money('USD')
+                    ->sortable()
+                    ->weight('bold'),
+
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
+            ->defaultSort('created_at', 'desc')
             ->filters([
                 Tables\Filters\SelectFilter::make('status')
                     ->options(PayrollStatus::class),
-                Tables\Filters\SelectFilter::make('user')
-                    ->relationship('user', 'name'),
+
+                Tables\Filters\SelectFilter::make('user_id')
+                    ->label('Technician')
+                    ->options(
+                        User::where('role', 'Tech')
+                            ->orderBy('name')
+                            ->pluck('name', 'id')
+                            ->toArray()
+                    )
+                    ->searchable(),
             ])
             ->actions([
+                EditAction::make(),
                 Action::make('recalculate')
-                    ->label('Recalculate')
-                    ->icon('heroicon-m-arrow-path')
-                    ->color('warning')
-                    ->visible(fn(Payroll $record) => $record->status === PayrollStatus::Draft)
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('info')
                     ->action(function (Payroll $record) {
-                        try {
-                            $record->recalculate();
-                            Notification::make()
-                                ->title('Payroll updated')
-                                ->success()
-                                ->send();
-                        } catch (\Exception $e) {
-                            Notification::make()
-                                ->title('Error during recalculation')
-                                ->body($e->getMessage())
-                                ->danger()
-                                ->send();
-                        }
-                    }),
-                Action::make('approve')
-                    ->label('Approve & Pay')
-                    ->icon('heroicon-m-check-badge')
-                    ->color('success')
-                    ->requiresConfirmation()
-                    ->visible(fn(Payroll $record) => $record->status === PayrollStatus::Draft)
-                    ->action(function (Payroll $record) {
-                        $record->update(['status' => PayrollStatus::Paid]);
-                        
-                        // Mark associated loan installments as paid
-                        \App\Models\LoanInstallment::whereHas('loan', function ($q) use ($record) {
-                            $q->where('user_id', $record->user_id);
-                        })
-                        ->whereBetween('due_date', [
-                            \Carbon\Carbon::now()->setISODate($record->year, $record->week_number)->startOfWeek(\Carbon\Carbon::SUNDAY),
-                            \Carbon\Carbon::now()->setISODate($record->year, $record->week_number)->endOfWeek(\Carbon\Carbon::SATURDAY)
-                        ])
-                        ->update(['is_paid' => true, 'payroll_id' => $record->id]);
-
-                        Notification::make()
-                            ->title('Payroll approved and marked as Paid')
+                        $record->recalculate();
+                        \Filament\Notifications\Notification::make()
+                            ->title('Payroll Recalculated')
                             ->success()
                             ->send();
-                    }),
-                EditAction::make(),
+                    })
+                    ->requiresConfirmation()
+                    ->modalHeading('Recalculate Payroll')
+                    ->modalDescription('This will re-sum all linked tasks and loan installments.'),
             ])
             ->bulkActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
-            ])
-            ->defaultSort('created_at', 'desc');
+            ]);
+    }
+
+    public static function getRelations(): array
+    {
+        return [
+            RelationManagers\PayrollItemsRelationManager::class,
+            RelationManagers\LoanDeductionsRelationManager::class,
+        ];
     }
 
     public static function getPages(): array
     {
         return [
             'index' => Pages\ListPayrolls::route('/'),
+            'create' => Pages\CreatePayroll::route('/create'),
+            'edit' => Pages\EditPayroll::route('/{record}/edit'),
         ];
     }
 }

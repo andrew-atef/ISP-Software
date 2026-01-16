@@ -32,6 +32,8 @@ class Task extends Model
         'import_batch_id',
         'completion_date',
         'is_offline_sync',
+        'company_invoice_id',
+        'payroll_id',
     ];
 
     protected $casts = [
@@ -96,18 +98,25 @@ class Task extends Model
 
     // Methods
 
+    /**
+     * Returns the tech payment for this task.
+     * 
+     * This method strictly returns the stored tech_price snapshot from the DB.
+     * It does NOT calculate anything - it preserves historical financial accuracy.
+     *
+     * @return float The tech price, or 0.00 if null.
+     */
     public function calculateTechPay(): float
     {
-        if ($this->parent_task_id) {
-            // It's a sub-task (e.g. Drop Bury), tech gets specific price
-            return $this->tech_price;
-        }
+        return $this->tech_price ?? 0.00;
+    }
+    public function companyInvoice()
+    {
+        return $this->belongsTo(CompanyInvoice::class);
+    }
 
-        // Main task logic (example)
-        if ($this->task_type === TaskType::NewInstall) {
-            return 110.00; // Base rate
-        }
-
-        return $this->tech_price;
+    public function payroll()
+    {
+        return $this->belongsTo(Payroll::class);
     }
 }

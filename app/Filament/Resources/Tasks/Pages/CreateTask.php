@@ -13,26 +13,23 @@ class CreateTask extends CreateRecord
         $customerData = [
             'wire3_cid' => $data['wire3_cid'],
             'name' => $data['customer_name'],
-            'phone' => $data['customer_phone'] ?? null, // specific to this form, model says nullable usually?
+            'phone' => $data['customer_phone'] ?? null,
             'address' => $data['customer_address'],
         ];
 
-        // Find or create customer
-        // Logic: Check if exists by wire3_cid. If yes, update. If no, create.
-        
-        $customer = \App\Models\Customer::where('wire3_cid', $data['wire3_cid'])->first();
+        // Check if customer exists by wire3_cid
+        $existingCustomer = \App\Models\Customer::where('wire3_cid', $data['wire3_cid'])->first();
 
-        if ($customer) {
-            $customer->update([
-                'name' => $customerData['name'],
-                'phone' => $customerData['phone'] ?? $customer->phone,
-                'address' => $customerData['address'],
-            ]);
+        if ($existingCustomer) {
+            // Customer exists: Use their ID, DO NOT overwrite their data
+            $customerId = $existingCustomer->id;
         } else {
-            $customer = \App\Models\Customer::create($customerData);
+            // New Customer: Create them
+            $newCustomer = \App\Models\Customer::create($customerData);
+            $customerId = $newCustomer->id;
         }
 
-        $data['customer_id'] = $customer->id;
+        $data['customer_id'] = $customerId;
 
         // Cleanup fields that don't exist in tasks table
         unset($data['wire3_cid']);

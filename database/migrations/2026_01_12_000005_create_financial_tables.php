@@ -44,15 +44,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        Schema::create('company_invoices', function (Blueprint $table) {
-            $table->id();
-            $table->string('invoice_number')->unique();
-            $table->date('period_start');
-            $table->date('period_end');
-            $table->decimal('total_amount', 10, 2);
-            $table->string('status')->default('draft');
-            $table->timestamps();
-        });
+
     }
 
     /**
@@ -60,7 +52,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('company_invoices');
+
         Schema::dropIfExists('loan_installments');
         Schema::dropIfExists('payrolls');
         Schema::dropIfExists('loans');

@@ -53,8 +53,8 @@ class User extends Authenticatable
             'password' => 'hashed',
             'role' => \App\Enums\UserRole::class,
             'last_seen_at' => 'datetime',
-            'current_lat' => 'decimal:8',
-            'current_lng' => 'decimal:8',
+            'current_lat' => 'float',
+            'current_lng' => 'float',
             'is_active' => 'boolean',
         ];
     }
@@ -76,6 +76,11 @@ class User extends Authenticatable
         return $this->hasMany(Loan::class);
     }
 
+    public function loanInstallments(): \Illuminate\Database\Eloquent\Relations\HasManyThrough
+    {
+        return $this->hasManyThrough(LoanInstallment::class, Loan::class);
+    }
+
     public function payrolls(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(Payroll::class);
@@ -86,12 +91,19 @@ class User extends Authenticatable
         return $this->inventoryWallet()->where('inventory_item_id', $itemId)->value('quantity') ?? 0;
     }
 
+    /**
+     * Get current week earnings (pending payment).
+     *
+     * Returns sum of tech_price for Approved tasks completed this week
+     * that haven't been assigned to a payroll record yet.
+     */
     public function getCurrentWeekEarningsAttribute(): float
     {
         $start = \Carbon\Carbon::now()->startOfWeek(\Carbon\Carbon::SUNDAY);
-        return $this->tasks()
+        return (float) $this->tasks()
             ->where('status', \App\Enums\TaskStatus::Approved)
             ->where('completion_date', '>=', $start)
+            ->whereNull('payroll_id') // Exclude tasks already assigned to payroll
             ->sum('tech_price');
     }
 }

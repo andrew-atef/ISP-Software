@@ -3,9 +3,10 @@
 namespace App\Models;
 
 use App\Enums\PayrollStatus;
+use App\Enums\TaskStatus;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Carbon\Carbon;
 
 class Payroll extends Model
 {
@@ -42,51 +43,65 @@ class Payroll extends Model
         return $this->hasMany(LoanInstallment::class);
     }
 
+    public function tasks(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Task::class);
+    }
+
+    /**
+     * Get precise week date range.
+     * 
+     * FIX #2: Centralized date precision logic.
+     * Uses startOfDay/endOfDay for exact boundaries.
+     */
+    public static function getWeekDateRange(int $year, int $week): array
+    {
+        $start = Carbon::now()
+            ->setISODate($year, $week)
+            ->startOfWeek(Carbon::SUNDAY)
+            ->startOfDay();
+
+        $end = $start->copy()
+            ->endOfWeek(Carbon::SATURDAY)
+            ->endOfDay();
+
+        return [$start, $end];
+    }
+
+    /**
+     * Recalculate payroll financials from linked tasks and loan installments.
+     * 
+     * This method re-sums all linked tasks (tech_price) and loan installments (amount)
+     * to compute Gross, Deductions, and Net Pay amounts.
+     * 
+     * Mathematical breakdown:
+     * - gross_amount = sum of all linked tasks' tech_price
+     * - deductions_amount = sum of all linked loan installments' amount (or deduction_override if set)
+     * - net_pay = gross_amount + bonus_amount - deductions_amount
+     * 
+     * This is a WRITE operation that updates this Payroll record's financial totals.
+     */
     public function recalculate(): void
     {
-        // 1. Determine Week Range based on stored week_number/year
-        // ISO-8601 weeks start on Monday. Adjust if business needs Sunday.
-        // Assuming Carbon's default startOfWeek() (Monday) for now.
-        $start = Carbon::now()->setISODate($this->year, $this->week_number)->startOfWeek(Carbon::SUNDAY);
-        $end = $start->copy()->endOfWeek(Carbon::SATURDAY);
-
-        // 2. Gross Earnings from Tasks
-        // Sum tech_price of tasks completed in this window
-        $tasksTotal = Task::where('assigned_tech_id', $this->user_id)
-            ->where('status', \App\Enums\TaskStatus::Approved)
-            ->whereBetween('completion_date', [$start, $end])
+        // Sum tech_price from all linked tasks (Payable regardless of financial_status)
+        $grossAmount = $this->tasks()
             ->sum('tech_price');
 
-        // Apply Bonus
-        $gross = $tasksTotal + ($this->bonus_amount ?? 0);
+        // Sum amount from all linked loan installments
+        $deductionsAmount = $this->loanInstallments()
+            ->sum('amount');
 
-        // 3. Deductions from Loans
-        // Find installments due this week, not yet assigned to ANOTHER payroll (or assigned to this one)
-        $installments = LoanInstallment::whereHas('loan', function ($q) {
-            $q->where('user_id', $this->user_id);
-        })
-            ->whereBetween('due_date', [$start->toDateString(), $end->toDateString()])
-            ->where(function ($q) {
-                $q->whereNull('payroll_id')
-                    ->orWhere('payroll_id', $this->id);
-            })
-            ->get();
+        // Use deduction_override if explicitly set, otherwise use calculated deductions
+        $finalDeductions = $this->deduction_override ?? (float) $deductionsAmount;
 
-        $systemDeductions = $installments->sum('amount');
+        // Calculate net pay: gross + bonus - deductions
+        $netPay = $grossAmount + ($this->bonus_amount ?? 0) - $finalDeductions;
 
-        // Apply Override if set
-        $finalDeductions = $this->deduction_override ?? $systemDeductions;
-
-        // Link these installments to this payroll record
-        foreach ($installments as $installment) {
-            $installment->update(['payroll_id' => $this->id]);
-        }
-
-        // 4. Update Totals
-        $this->updateQuietly([
-            'gross_amount' => $gross,
-            'deductions_amount' => $finalDeductions,
-            'net_pay' => $gross - $finalDeductions,
+        // Update this record with calculated totals
+        $this->update([
+            'gross_amount' => $grossAmount,
+            'deductions_amount' => $deductionsAmount,
+            'net_pay' => $netPay,
         ]);
     }
 }

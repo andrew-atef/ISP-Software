@@ -121,7 +121,14 @@ class TasksTable
                                 ->required(),
                         ])
                         ->action(function (Collection $records, array $data): void {
-                            $records->each(fn($record) => $record->update(['status' => $data['status']]));
+                            $records->each(function ($record) use ($data) {
+                                $updateData = ['status' => $data['status']];
+                                // Fix: Bulk Action Logic - Set completion_date if marking as Completed
+                                if ($data['status'] === \App\Enums\TaskStatus::Completed->value && $record->completion_date === null) {
+                                    $updateData['completion_date'] = now();
+                                }
+                                $record->update($updateData);
+                            });
                         })
                         ->deselectRecordsAfterCompletion(),
                     DeleteBulkAction::make(),

@@ -6,7 +6,7 @@ namespace App\Filament\Resources\Tasks\Schemas;
 use App\Enums\TaskFinancialStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
-use \App\Models\JobPrice;
+use App\Models\JobPrice;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -76,9 +76,6 @@ class TaskForm
                             ->required()
                             ->live()
                             ->afterStateUpdated(function ($get, $set) {
-                                self::updatePricing($get, $set);
-                            })
-                            ->afterStateHydrated(function ($get, $set) {
                                 self::updatePricing($get, $set);
                             }),
 

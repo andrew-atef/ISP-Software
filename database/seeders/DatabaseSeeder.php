@@ -2,15 +2,16 @@
 
 namespace Database\Seeders;
 
-use App\Enums\InventoryItemType;
 use App\Enums\TaskFinancialStatus;
 use App\Enums\TaskMediaType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\UserRole;
+use App\Enums\InventoryItemType;
 use App\Models\Customer;
 use App\Models\InventoryItem;
 use App\Models\InventoryWallet;
+use App\Models\JobPrice;
 use App\Models\OriginalTech;
 use App\Models\Task;
 use App\Models\TaskDetail;
@@ -26,6 +27,11 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        // =====================
+        // CALL JobPriceSeeder FIRST (Dependency)
+        // =====================
+        $this->call(JobPriceSeeder::class);
+
         // =====================
         // USERS
         // =====================
@@ -152,10 +158,14 @@ class DatabaseSeeder extends Seeder
         ]);
 
         // =====================
-        // TASKS
+        // TASKS (Dynamic Pricing from JobPrice)
         // =====================
 
+        // Helper: Get price from JobPrice or default to 0
+        $getPrice = fn (TaskType $type) => JobPrice::where('task_type', $type)->first();
+
         // Scenario A: Completed New Install (Islam Youssef)
+        $newInstallPrice = $getPrice(TaskType::NewInstall);
         $taskA = Task::create([
             'customer_id' => $customer1->id,
             'parent_task_id' => null,
@@ -164,8 +174,8 @@ class DatabaseSeeder extends Seeder
             'task_type' => TaskType::NewInstall,
             'status' => TaskStatus::Completed,
             'financial_status' => TaskFinancialStatus::Billable,
-            'company_price' => 350.00,
-            'tech_price' => 145.00,
+            'company_price' => (float) ($newInstallPrice?->company_price ?? 0.00),
+            'tech_price' => (float) ($newInstallPrice?->tech_price ?? 0.00),
             'scheduled_date' => now()->subDays(2)->toDateString(),
             'time_slot_start' => '09:00',
             'time_slot_end' => '12:00',
@@ -232,6 +242,8 @@ class DatabaseSeeder extends Seeder
         ]);
 
         // Scenario B: Pending Drop Bury (Mourad Shokralla)
+        // NotBillable: company_price = 0, tech_price from JobPrice
+        $dropBuryPrice = $getPrice(TaskType::DropBury);
         $taskB = Task::create([
             'customer_id' => $customer2->id,
             'parent_task_id' => null,
@@ -240,8 +252,8 @@ class DatabaseSeeder extends Seeder
             'task_type' => TaskType::DropBury,
             'status' => TaskStatus::Pending,
             'financial_status' => TaskFinancialStatus::NotBillable,
-            'company_price' => 0.00,
-            'tech_price' => 35.00,
+            'company_price' => 0.00, // NotBillable forces 0
+            'tech_price' => (float) ($dropBuryPrice?->tech_price ?? 0.00),
             'scheduled_date' => now()->addDays(1)->toDateString(),
             'time_slot_start' => '14:00',
             'time_slot_end' => '17:00',
@@ -253,6 +265,7 @@ class DatabaseSeeder extends Seeder
         ]);
 
         // Additional Task: Service Call (for variety)
+        $serviceCallPrice = $getPrice(TaskType::ServiceCall);
         Task::create([
             'customer_id' => $customer1->id,
             'parent_task_id' => null,
@@ -261,8 +274,8 @@ class DatabaseSeeder extends Seeder
             'task_type' => TaskType::ServiceCall,
             'status' => TaskStatus::Assigned,
             'financial_status' => TaskFinancialStatus::Billable,
-            'company_price' => 75.00,
-            'tech_price' => 40.00,
+            'company_price' => (float) ($serviceCallPrice?->company_price ?? 0.00),
+            'tech_price' => (float) ($serviceCallPrice?->tech_price ?? 0.00),
             'scheduled_date' => now()->addDays(3)->toDateString(),
             'time_slot_start' => '10:00',
             'time_slot_end' => '11:00',

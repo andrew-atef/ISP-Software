@@ -91,9 +91,11 @@ class TechnicianResource extends Resource
                     ->schema([
                         Forms\Components\TextInput::make('password')
                             ->password()
-                            ->dehydrateStateUsing(fn($state) => Hash::make($state))
+                            ->nullable()
+                            ->dehydrateStateUsing(fn($state) => filled($state) ? Hash::make($state) : null)
                             ->dehydrated(fn($state) => filled($state))
-                            ->required(fn(string $context): bool => $context === 'create'),
+                            ->required(fn(string $context): bool => $context === 'create')
+                            ->helperText(fn(string $context): ?string => $context === 'edit' ? 'Leave blank to keep current password' : null),
                     ]),
                 InfoSection::make('Status')
                     ->columnSpan(1)
@@ -220,10 +222,8 @@ class TechnicianResource extends Resource
     public static function getRelations(): array
     {
         return [
-            RelationManagers\InventoryWalletRelationManager::class,
             RelationManagers\TasksRelationManager::class,
             RelationManagers\LoansRelationManager::class,
-            RelationManagers\PayrollsRelationManager::class,
         ];
     }
 

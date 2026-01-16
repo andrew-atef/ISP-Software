@@ -1,3 +1,4 @@
-<div class="w-full rounded-lg overflow-hidden border border-gray-300 dark:border-gray-700">
+<div class="w-full">
+    {{-- هنا بنمرر الـ record الحالي للـ Livewire Component --}}
     @livewire('live-tech-location-widget', ['record' => $getRecord()])
 </div>

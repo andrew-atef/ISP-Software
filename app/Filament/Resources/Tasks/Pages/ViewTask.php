@@ -34,7 +34,6 @@ class ViewTask extends ViewRecord
                 ->action(function (Task $record): void {
                     $record->update([
                         'status' => TaskStatus::Approved,
-                        'financial_status' => TaskFinancialStatus::Billable,
                     ]);
 
                     Notification::make()
