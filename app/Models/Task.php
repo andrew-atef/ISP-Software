@@ -2,15 +2,18 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use App\Enums\TaskFinancialStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
+use Guava\Calendar\Contracts\Eventable;
+use Guava\Calendar\ValueObjects\CalendarEvent;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class Task extends Model
+class Task extends Model implements Eventable
 {
     use HasFactory, SoftDeletes;
 
@@ -110,6 +113,93 @@ class Task extends Model
     {
         return $this->tech_price ?? 0.00;
     }
+
+    public function toCalendarEvent(): CalendarEvent
+    {
+        $start = $this->buildScheduledDateTime($this->time_slot_start);
+        $end = $this->buildScheduledDateTime($this->time_slot_end);
+
+        $isAllDay = $this->time_slot_start === null;
+
+        if ($isAllDay) {
+            $start ??= Carbon::make($this->scheduled_date)?->startOfDay();
+            $end ??= $start?->copy()?->addDay(); // Full-day block
+        } else {
+            if ($start && ! $end) {
+                $end = (clone $start)->addHour();
+            }
+
+            if (! $start && $end) {
+                $start = Carbon::make($this->scheduled_date)?->startOfDay();
+            }
+
+            if ($start && $end && $end->lessThanOrEqualTo($start)) {
+                $end = (clone $start)->addHour();
+            }
+        }
+
+        $start ??= Carbon::now()->startOfDay();
+        $end ??= (clone $start)->addHour();
+
+        $event = CalendarEvent::make($this)
+            ->title($this->getCalendarTitle())
+            ->start($start)
+            ->end($end)
+            ->backgroundColor($this->getStatusColor())
+            ->action('view');
+
+        if ($isAllDay) {
+            $event->allDay();
+        }
+
+        return $event;
+    }
+
+    protected function getCalendarTitle(): string
+    {
+        // $customerName = $this->customer?->name ?? 'Customer';
+        $customerName ='';
+        $taskLabel = $this->task_type?->getLabel() ?? ucfirst(str_replace('_', ' ', (string) $this->task_type));
+
+        return "{$customerName} - {$taskLabel}";
+    }
+
+    protected function getStatusColor(): string
+    {
+        return match ($this->status) {
+            TaskStatus::Approved => '#22c55e', // Green
+            TaskStatus::Pending => '#fb923c', // Orange
+            TaskStatus::Assigned => '#3b82f6', // Blue
+            TaskStatus::Started => '#0ea5e9', // Sky
+            TaskStatus::Paused => '#a855f7', // Purple
+            TaskStatus::Completed => '#10b981', // Emerald
+            TaskStatus::ReturnedForFix => '#f59e0b', // Amber
+            TaskStatus::Cancelled => '#ef4444', // Red
+            default => '#6b7280', // Gray fallback
+        };
+    }
+
+    protected function buildScheduledDateTime(?string $time): ?Carbon
+    {
+        if (! $this->scheduled_date) {
+            return null;
+        }
+
+        $dateString = Carbon::make($this->scheduled_date)?->toDateString();
+
+        if (! $dateString) {
+            return null;
+        }
+
+        if ($time === null) {
+            return Carbon::make($dateString)?->startOfDay();
+        }
+
+        $combined = Carbon::make($dateString . ' ' . $time);
+
+        return $combined?->copy();
+    }
+
     public function companyInvoice()
     {
         return $this->belongsTo(CompanyInvoice::class);

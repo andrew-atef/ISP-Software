@@ -150,36 +150,53 @@ class DatabaseSeeder extends Seeder
             $taskCounter++;
             $newInstallPrice = $getPrice(TaskType::NewInstall);
 
+            // Determine status and assign technician accordingly
             if ($i < 15) {
                 $status = TaskStatus::Approved;
-                $completionDate = Carbon::create(2026, 1, random_int(4, 16))->setTime(random_int(9, 17), 0);
+                $assignedTech = random_int(0, 1) === 0 ? $islamYoussef : $mouradShokralla;
             } elseif ($i < 25) {
                 $status = TaskStatus::Completed;
-                $completionDate = Carbon::create(2026, 1, random_int(1, 16))->setTime(random_int(9, 17), 0);
+                $assignedTech = random_int(0, 1) === 0 ? $islamYoussef : $mouradShokralla;
             } else {
-                // FIXED: Changed to Assigned (since we assign a tech below)
-                $status = TaskStatus::Assigned;
+                // Pending tasks MUST have no assigned technician
+                $status = TaskStatus::Pending;
+                $assignedTech = null;
+            }
+
+            // Generate time slots: start hour (8-15) + duration (1-3 hours)
+            $startHour = random_int(8, 15);
+            $duration = random_int(1, 3);
+            $endHour = $startHour + $duration;
+            $timeSlotStart = sprintf('%02d:00', $startHour);
+            $timeSlotEnd = sprintf('%02d:00', $endHour);
+
+            // Generate scheduled date and completion date
+            $scheduledDay = random_int(1, 20);
+            $scheduledDate = Carbon::create(2026, 1, $scheduledDay)->toDateString();
+
+            // For Approved/Completed tasks, set completion_date to scheduled_date + end_time
+            if ($status === TaskStatus::Approved || $status === TaskStatus::Completed) {
+                $completionDate = Carbon::create(2026, 1, $scheduledDay)->setTime($endHour, 0);
+            } else {
                 $completionDate = null;
             }
 
-            $scheduledDate = $completionDate ? $completionDate->toDateString() : Carbon::create(2026, 1, random_int(1, 20))->toDateString();
             $customer = $customers[random_int(0, 19)];
-            $tech = random_int(0, 1) === 0 ? $islamYoussef : $mouradShokralla;
             $originalTech = random_int(0, 1) === 0 ? $techXC5 : $techXC1;
 
             $task = Task::create([
                 'customer_id' => $customer->id,
                 'parent_task_id' => null,
                 'original_tech_id' => $originalTech->id,
-                'assigned_tech_id' => $tech->id,
+                'assigned_tech_id' => $assignedTech?->id,
                 'task_type' => TaskType::NewInstall,
                 'status' => $status,
                 'financial_status' => TaskFinancialStatus::Billable,
                 'company_price' => (float) ($newInstallPrice?->company_price ?? 0.00),
                 'tech_price' => (float) ($newInstallPrice?->tech_price ?? 0.00),
                 'scheduled_date' => $scheduledDate,
-                'time_slot_start' => sprintf('%02d:00', random_int(8, 16)),
-                'time_slot_end' => sprintf('%02d:00', random_int(12, 18)),
+                'time_slot_start' => $timeSlotStart,
+                'time_slot_end' => $timeSlotEnd,
                 'saf_link' => 'https://wire3.com/saf/' . str_pad($taskCounter, 6, '0', STR_PAD_LEFT),
                 'description' => "New fiber installation for {$customer->name}. Task #{$taskCounter}.",
                 'import_batch_id' => 'BATCH-2026-01-' . str_pad(random_int(1, 16), 2, '0', STR_PAD_LEFT),
@@ -214,20 +231,36 @@ class DatabaseSeeder extends Seeder
             $taskCounter++;
             $dropBuryPrice = $getPrice(TaskType::DropBury);
 
+            // Determine status and assign technician accordingly
             if ($i < 5) {
                 $status = TaskStatus::Approved;
                 $financialStatus = TaskFinancialStatus::NotBillable;
-                $completionDate = Carbon::create(2026, 1, random_int(4, 16))->setTime(random_int(9, 17), 0);
-                $tech = random_int(0, 1) === 0 ? $islamYoussef : $mouradShokralla; // Assigned Tech
+                $assignedTech = random_int(0, 1) === 0 ? $islamYoussef : $mouradShokralla;
             } else {
-                // FIXED: Pending tasks MUST NOT have an assigned tech
+                // Pending tasks MUST have no assigned technician
                 $status = TaskStatus::Pending;
-                $financialStatus = TaskFinancialStatus::Billable;
-                $completionDate = null;
-                $tech = null; // NULL for Pending
+                $financialStatus = TaskFinancialStatus::NotBillable;
+                $assignedTech = null;
             }
 
-            $scheduledDate = $completionDate ? $completionDate->toDateString() : Carbon::create(2026, 1, random_int(1, 20))->toDateString();
+            // Generate time slots: start hour (8-15) + duration (1-3 hours)
+            $startHour = random_int(8, 15);
+            $duration = random_int(1, 3);
+            $endHour = $startHour + $duration;
+            $timeSlotStart = sprintf('%02d:00', $startHour);
+            $timeSlotEnd = sprintf('%02d:00', $endHour);
+
+            // Generate scheduled date and completion date
+            $scheduledDay = random_int(1, 20);
+            $scheduledDate = Carbon::create(2026, 1, $scheduledDay)->toDateString();
+
+            // For Approved/Completed tasks, set completion_date to scheduled_date + end_time
+            if ($status === TaskStatus::Approved || $status === TaskStatus::Completed) {
+                $completionDate = Carbon::create(2026, 1, $scheduledDay)->setTime($endHour, 0);
+            } else {
+                $completionDate = null;
+            }
+
             $customer = $customers[random_int(0, 19)];
             $originalTech = random_int(0, 1) === 0 ? $techXC5 : $techXC1;
 
@@ -235,15 +268,15 @@ class DatabaseSeeder extends Seeder
                 'customer_id' => $customer->id,
                 'parent_task_id' => null,
                 'original_tech_id' => $originalTech->id,
-                'assigned_tech_id' => $tech ? $tech->id : null, // Handle null
+                'assigned_tech_id' => $assignedTech?->id,
                 'task_type' => TaskType::DropBury,
                 'status' => $status,
                 'financial_status' => $financialStatus,
                 'company_price' => $financialStatus === TaskFinancialStatus::NotBillable ? 0.00 : (float) ($dropBuryPrice?->company_price ?? 0.00),
                 'tech_price' => (float) ($dropBuryPrice?->tech_price ?? 0.00),
                 'scheduled_date' => $scheduledDate,
-                'time_slot_start' => sprintf('%02d:00', random_int(8, 16)),
-                'time_slot_end' => sprintf('%02d:00', random_int(12, 18)),
+                'time_slot_start' => $timeSlotStart,
+                'time_slot_end' => $timeSlotEnd,
                 'saf_link' => null,
                 'description' => "Drop bury work for {$customer->name}.",
                 'import_batch_id' => 'BATCH-2026-01-' . str_pad(random_int(1, 16), 2, '0', STR_PAD_LEFT),
@@ -274,34 +307,52 @@ class DatabaseSeeder extends Seeder
             $taskCounter++;
             $serviceCallPrice = $getPrice(TaskType::ServiceCall);
 
+            // Determine status and assign technician accordingly
             if ($i < 5) {
                 $status = TaskStatus::Approved;
-                $completionDate = Carbon::create(2026, 1, random_int(4, 16))->setTime(random_int(9, 17), 0);
+                $assignedTech = random_int(0, 1) === 0 ? $islamYoussef : $mouradShokralla;
             } elseif ($i < 8) {
                 $status = TaskStatus::Completed;
-                $completionDate = Carbon::create(2026, 1, random_int(1, 16))->setTime(random_int(9, 17), 0);
+                $assignedTech = random_int(0, 1) === 0 ? $islamYoussef : $mouradShokralla;
             } else {
-                $status = TaskStatus::Assigned; // Changed to Assigned
+                // Pending tasks MUST have no assigned technician
+                $status = TaskStatus::Pending;
+                $assignedTech = null;
+            }
+
+            // Generate time slots: start hour (8-15) + duration (1-3 hours)
+            $startHour = random_int(8, 15);
+            $duration = random_int(1, 3);
+            $endHour = $startHour + $duration;
+            $timeSlotStart = sprintf('%02d:00', $startHour);
+            $timeSlotEnd = sprintf('%02d:00', $endHour);
+
+            // Generate scheduled date and completion date
+            $scheduledDay = random_int(1, 20);
+            $scheduledDate = Carbon::create(2026, 1, $scheduledDay)->toDateString();
+
+            // For Approved/Completed tasks, set completion_date to scheduled_date + end_time
+            if ($status === TaskStatus::Approved || $status === TaskStatus::Completed) {
+                $completionDate = Carbon::create(2026, 1, $scheduledDay)->setTime($endHour, 0);
+            } else {
                 $completionDate = null;
             }
 
-            $scheduledDate = $completionDate ? $completionDate->toDateString() : Carbon::create(2026, 1, random_int(1, 20))->toDateString();
             $customer = $customers[random_int(0, 19)];
-            $tech = random_int(0, 1) === 0 ? $islamYoussef : $mouradShokralla;
             $originalTech = random_int(0, 1) === 0 ? $techXC5 : $techXC1;
 
             $task = Task::create([
                 'customer_id' => $customer->id,
                 'original_tech_id' => $originalTech->id,
-                'assigned_tech_id' => $tech->id,
+                'assigned_tech_id' => $assignedTech?->id,
                 'task_type' => TaskType::ServiceCall,
                 'status' => $status,
                 'financial_status' => TaskFinancialStatus::Billable,
                 'company_price' => (float) ($serviceCallPrice?->company_price ?? 0.00),
                 'tech_price' => (float) ($serviceCallPrice?->tech_price ?? 0.00),
                 'scheduled_date' => $scheduledDate,
-                'time_slot_start' => sprintf('%02d:00', random_int(8, 16)),
-                'time_slot_end' => sprintf('%02d:00', random_int(9, 17)),
+                'time_slot_start' => $timeSlotStart,
+                'time_slot_end' => $timeSlotEnd,
                 'description' => "Service call for {$customer->name}. Issue: " . $this->getRandomIssue(),
                 'completion_date' => $completionDate,
             ]);
