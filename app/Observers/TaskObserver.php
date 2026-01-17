@@ -7,6 +7,8 @@ use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\JobPrice;
 use App\Models\Task;
+use App\Models\InventoryTransaction;
+use App\Models\InventoryWallet;
 
 class TaskObserver
 {
@@ -47,13 +49,14 @@ class TaskObserver
     /**
      * Handle the Task "updated" event.
      *
-     * Triggers automated sub-task generation for "Split Scenarios":
-     * When a NewInstall task is marked Completed but drop_bury is NOT done,
-     * automatically create a DropBury sub-task.
+     * Triggers two automated actions:
+     * 1. DropBury sub-task generation when NewInstall completed without bury
+     * 2. Inventory consumption deduction when task is Completed/Approved
      */
     public function updated(Task $task): void
     {
         $this->handleDropBurySubTaskGeneration($task);
+        $this->handleInventoryConsumption($task);
     }
 
     /**
@@ -167,5 +170,87 @@ class TaskObserver
             'saf_link' => $task->saf_link,
             'import_batch_id' => $task->import_batch_id,
         ]);
+    }
+
+    /**
+     * Handle inventory consumption deduction.
+     *
+     * When a Task is marked as Completed or Approved:
+     * - Query the task's inventory_consumptions (tracked items only)
+     * - Deduct quantities from the assigned technician's wallet
+     * - Log transactions for audit trail
+     *
+     * Business Rule:
+     * - Only deduct once: Check if already processed via a flag or by checking
+     *   existing transactions for this task
+     */
+    protected function handleInventoryConsumption(Task $task): void
+    {
+        // =====================
+        // TRIGGER CONDITIONS
+        // =====================
+
+        // 1. Only run if status changed to Completed or Approved
+        if (!$task->wasChanged('status')) {
+            return;
+        }
+
+        if (!in_array($task->status, [TaskStatus::Completed, TaskStatus::Approved])) {
+            return;
+        }
+
+        // 2. Task must have an assigned technician
+        if (!$task->assigned_tech_id) {
+            return;
+        }
+
+        // 3. Skip if task has no inventory consumptions recorded
+        $consumptions = $task->inventoryConsumptions;
+        if ($consumptions->isEmpty()) {
+            return;
+        }
+
+        // =====================
+        // IDEMPOTENCY CHECK
+        // =====================
+
+        // Check if inventory was already deducted for this task
+        $alreadyProcessed = InventoryTransaction::where('task_id', $task->id)
+            ->where('type', 'consumed')
+            ->exists();
+
+        if ($alreadyProcessed) {
+            return; // Prevent duplicate deductions
+        }
+
+        // =====================
+        // INVENTORY DEDUCTION
+        // =====================
+
+        foreach ($consumptions as $consumption) {
+            $quantity = $consumption->quantity;
+            $itemId = $consumption->inventory_item_id;
+            $techId = $task->assigned_tech_id;
+
+            // Get or create wallet entry for tech
+            $wallet = InventoryWallet::firstOrCreate(
+                ['user_id' => $techId, 'inventory_item_id' => $itemId],
+                ['quantity' => 0]
+            );
+
+            // Deduct from wallet
+            $wallet->decrement('quantity', $quantity);
+
+            // Log transaction for audit trail
+            InventoryTransaction::create([
+                'inventory_item_id' => $itemId,
+                'source_user_id' => $techId,
+                'target_user_id' => null,
+                'task_id' => $task->id,
+                'quantity' => $quantity,
+                'type' => 'consumed',
+                'notes' => "Consumed during {$task->task_type->getLabel()} task (Task #{$task->id})",
+            ]);
+        }
     }
 }

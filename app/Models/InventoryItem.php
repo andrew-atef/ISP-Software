@@ -15,10 +15,12 @@ class InventoryItem extends Model
         'sku',
         'type',
         'description',
+        'is_tracked',
     ];
 
     protected $casts = [
         'type' => InventoryItemType::class,
+        'is_tracked' => 'boolean',
     ];
 
     public function wallets(): \Illuminate\Database\Eloquent\Relations\HasMany

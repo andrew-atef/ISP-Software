@@ -194,7 +194,7 @@ class TechnicianResource extends Resource
                                     ->label('Tasks Completed (Month)')
                                     ->state(fn(User $record) => $record->tasks()->where('status', \App\Enums\TaskStatus::Completed)->whereMonth('completion_date', now()->month)->count()),
                                 TextEntry::make('wallet_count')
-                                    ->label('Items in Truck')
+                                    ->label('Items')
                                     ->state(fn(User $record) => $record->inventoryWallet()->sum('quantity')),
                             ]),
                     ]),
@@ -224,6 +224,7 @@ class TechnicianResource extends Resource
         return [
             RelationManagers\TasksRelationManager::class,
             RelationManagers\LoansRelationManager::class,
+            RelationManagers\InventoryWalletRelationManager::class,
         ];
     }
 

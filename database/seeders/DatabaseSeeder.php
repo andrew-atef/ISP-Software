@@ -25,6 +25,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(JobPriceSeeder::class);
+        $this->call(InventorySeeder::class);
 
         // =====================
         // USERS
@@ -71,24 +72,28 @@ class DatabaseSeeder extends Seeder
         // =====================
         // INVENTORY ITEMS
         // =====================
-        $eeroPro7 = InventoryItem::create([
-            'name' => 'EERO Pro 7', 'sku' => 'EERO-PRO-7', 'type' => InventoryItemType::Indoor, 'description' => 'High-performance mesh WiFi router.',
-        ]);
-        $nokiaOnt = InventoryItem::create([
-            'name' => 'Nokia ONT', 'sku' => 'NOKIA-ONT-G1', 'type' => InventoryItemType::Indoor, 'description' => 'Optical Network Terminal.',
-        ]);
-        $fiberCable = InventoryItem::create([
-            'name' => 'Fiber Cable (100m)', 'sku' => 'FIBER-CBL-100M', 'type' => InventoryItemType::Outdoor, 'description' => '100 meter fiber optic cable roll.',
-        ]);
+        // Items already created by InventorySeeder, just fetch them here
+        $eeroPro7 = InventoryItem::where('sku', 'EERO-PRO-7')->first() ?? InventoryItem::firstOrCreate(
+            ['sku' => 'EERO-PRO-7'],
+            ['name' => 'EERO Pro 7', 'type' => InventoryItemType::Indoor, 'description' => 'High-performance mesh WiFi router.']
+        );
+        $nokiaOnt = InventoryItem::where('sku', 'NOKIA-ONT-XS-010X-Q')->first() ?? InventoryItem::firstOrCreate(
+            ['sku' => 'NOKIA-ONT-XS-010X-Q'],
+            ['name' => 'Nokia ONT (XS-010X-Q)', 'type' => InventoryItemType::Indoor, 'description' => 'Optical Network Terminal.']
+        );
+        $fiberCable = InventoryItem::where('sku', 'FIBER-TERM-TAIL')->first() ?? InventoryItem::firstOrCreate(
+            ['sku' => 'FIBER-TERM-TAIL'],
+            ['name' => 'Fiber Cable - Term Tail', 'type' => InventoryItemType::Outdoor, 'description' => 'Fiber termination tail cable.']
+        );
 
         // =====================
         // INVENTORY WALLET
         // =====================
-        InventoryWallet::create(['user_id' => $islamYoussef->id, 'inventory_item_id' => $eeroPro7->id, 'quantity' => 50]);
-        InventoryWallet::create(['user_id' => $islamYoussef->id, 'inventory_item_id' => $nokiaOnt->id, 'quantity' => 30]);
-        InventoryWallet::create(['user_id' => $islamYoussef->id, 'inventory_item_id' => $fiberCable->id, 'quantity' => 15]);
-        InventoryWallet::create(['user_id' => $mouradShokralla->id, 'inventory_item_id' => $eeroPro7->id, 'quantity' => 40]);
-        InventoryWallet::create(['user_id' => $mouradShokralla->id, 'inventory_item_id' => $nokiaOnt->id, 'quantity' => 25]);
+        // InventoryWallet::create(['user_id' => $islamYoussef->id, 'inventory_item_id' => $eeroPro7->id, 'quantity' => 50]);
+        // InventoryWallet::create(['user_id' => $islamYoussef->id, 'inventory_item_id' => $nokiaOnt->id, 'quantity' => 30]);
+        // InventoryWallet::create(['user_id' => $islamYoussef->id, 'inventory_item_id' => $fiberCable->id, 'quantity' => 15]);
+        // InventoryWallet::create(['user_id' => $mouradShokralla->id, 'inventory_item_id' => $eeroPro7->id, 'quantity' => 40]);
+        // InventoryWallet::create(['user_id' => $mouradShokralla->id, 'inventory_item_id' => $nokiaOnt->id, 'quantity' => 25]);
 
         // =====================
         // CUSTOMERS

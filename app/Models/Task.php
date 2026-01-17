@@ -92,6 +92,11 @@ class Task extends Model implements Eventable
         return $this->hasMany(InventoryTransaction::class);
     }
 
+    public function inventoryConsumptions()
+    {
+        return $this->hasMany(TaskInventoryConsumption::class);
+    }
+
     // Scopes
 
     public function scopeBillable(Builder $query): Builder

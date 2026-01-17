@@ -8,6 +8,7 @@ use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\JobPrice;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
@@ -112,6 +113,34 @@ class TaskForm
                             ->prefix('$')
                             ->default(fn () => JobPrice::where('task_type', TaskType::NewInstall)->first()?->tech_price ?? 0)
                             ->required(),
+                    ]),
+
+                // Section 4: Inventory Consumption (Tracked Items Only)
+                Section::make('Inventory Consumption')
+                    ->columnSpanFull()
+                    ->description('Select major devices (ONTs, Eeros) installed during this task.')
+                    ->schema([
+                        Repeater::make('inventory_consumption')
+                            ->relationship('inventoryConsumptions')
+                            ->schema([
+                                Select::make('inventory_item_id')
+                                    ->label('Device')
+                                    ->options(function () {
+                                        return \App\Models\InventoryItem::where('is_tracked', true)
+                                            ->pluck('name', 'id');
+                                    })
+                                    ->searchable()
+                                    ->required(),
+                                TextInput::make('quantity')
+                                    ->label('Quantity')
+                                    ->numeric()
+                                    ->default(1)
+                                    ->minValue(1)
+                                    ->required(),
+                            ])
+                            ->columns(2)
+                            ->addActionLabel('Add Device')
+                            ->collapsible(),
                     ]),
             ]);
     }

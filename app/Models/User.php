@@ -71,6 +71,11 @@ class User extends Authenticatable
             ->withTimestamps();
     }
 
+    public function inventoryWallets(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(InventoryWallet::class);
+    }
+
     public function loans(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(Loan::class);
