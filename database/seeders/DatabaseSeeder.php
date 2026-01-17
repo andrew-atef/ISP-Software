@@ -63,6 +63,15 @@ class DatabaseSeeder extends Seeder
             'current_lng' => -81.581207,
         ]);
 
+        $sarahJenkins = User::create([
+            'name' => 'Sarah Jenkins',
+            'email' => 'dispatch@xconnect.com',
+            'password' => Hash::make('password'),
+            'role' => UserRole::Dispatch,
+            'phone' => '+18005550199',
+            'job_title' => 'Operations Manager',
+        ]);
+
         // =====================
         // ORIGINAL TECHS
         // =====================
@@ -146,6 +155,11 @@ class DatabaseSeeder extends Seeder
         // =====================
         // TASKS
         // =====================
+        // DATE DISTRIBUTION STRATEGY (for Payroll & QC Testing):
+        // - Approved Tasks → Jan 4-10 (Week 2) → Ensures Payroll Week 2 has billable data
+        // - Completed Tasks → Jan 11-17 (Week 3) → Ensures QC Board has items to review
+        // - Pending/Assigned → Jan 20+ (Future) → Ensures Dispatch Calendar shows future bookings
+        // =====================
         $taskCounter = 0;
         $tasksCreated = [];
         $getPrice = fn (TaskType $type) => JobPrice::where('task_type', $type)->first();
@@ -159,13 +173,19 @@ class DatabaseSeeder extends Seeder
             if ($i < 15) {
                 $status = TaskStatus::Approved;
                 $assignedTech = random_int(0, 1) === 0 ? $islamYoussef : $mouradShokralla;
+                // Approved: Week 2 (Jan 4-10) for Payroll testing
+                $scheduledDay = random_int(4, 10);
             } elseif ($i < 25) {
                 $status = TaskStatus::Completed;
                 $assignedTech = random_int(0, 1) === 0 ? $islamYoussef : $mouradShokralla;
+                // Completed: Week 3 (Jan 11-17) for QC Board testing
+                $scheduledDay = random_int(11, 17);
             } else {
                 // Pending tasks MUST have no assigned technician
                 $status = TaskStatus::Pending;
                 $assignedTech = null;
+                // Pending: Future (Jan 20+) for Dispatch Calendar
+                $scheduledDay = random_int(20, 31);
             }
 
             // Generate time slots: start hour (8-15) + duration (1-3 hours)
@@ -176,7 +196,6 @@ class DatabaseSeeder extends Seeder
             $timeSlotEnd = sprintf('%02d:00', $endHour);
 
             // Generate scheduled date and completion date
-            $scheduledDay = random_int(1, 20);
             $scheduledDate = Carbon::create(2026, 1, $scheduledDay)->toDateString();
 
             // For Approved/Completed tasks, set completion_date to scheduled_date + end_time
@@ -241,11 +260,15 @@ class DatabaseSeeder extends Seeder
                 $status = TaskStatus::Approved;
                 $financialStatus = TaskFinancialStatus::NotBillable;
                 $assignedTech = random_int(0, 1) === 0 ? $islamYoussef : $mouradShokralla;
+                // Approved: Week 2 (Jan 4-10) for Payroll testing
+                $scheduledDay = random_int(4, 10);
             } else {
                 // Pending tasks MUST have no assigned technician
                 $status = TaskStatus::Pending;
                 $financialStatus = TaskFinancialStatus::NotBillable;
                 $assignedTech = null;
+                // Pending: Future (Jan 20+) for Dispatch Calendar
+                $scheduledDay = random_int(20, 31);
             }
 
             // Generate time slots: start hour (8-15) + duration (1-3 hours)
@@ -256,7 +279,6 @@ class DatabaseSeeder extends Seeder
             $timeSlotEnd = sprintf('%02d:00', $endHour);
 
             // Generate scheduled date and completion date
-            $scheduledDay = random_int(1, 20);
             $scheduledDate = Carbon::create(2026, 1, $scheduledDay)->toDateString();
 
             // For Approved/Completed tasks, set completion_date to scheduled_date + end_time
@@ -316,13 +338,19 @@ class DatabaseSeeder extends Seeder
             if ($i < 5) {
                 $status = TaskStatus::Approved;
                 $assignedTech = random_int(0, 1) === 0 ? $islamYoussef : $mouradShokralla;
+                // Approved: Week 2 (Jan 4-10) for Payroll testing
+                $scheduledDay = random_int(4, 10);
             } elseif ($i < 8) {
                 $status = TaskStatus::Completed;
                 $assignedTech = random_int(0, 1) === 0 ? $islamYoussef : $mouradShokralla;
+                // Completed: Week 3 (Jan 11-17) for QC Board testing
+                $scheduledDay = random_int(11, 17);
             } else {
                 // Pending tasks MUST have no assigned technician
                 $status = TaskStatus::Pending;
                 $assignedTech = null;
+                // Pending: Future (Jan 20+) for Dispatch Calendar
+                $scheduledDay = random_int(20, 31);
             }
 
             // Generate time slots: start hour (8-15) + duration (1-3 hours)
@@ -333,7 +361,6 @@ class DatabaseSeeder extends Seeder
             $timeSlotEnd = sprintf('%02d:00', $endHour);
 
             // Generate scheduled date and completion date
-            $scheduledDay = random_int(1, 20);
             $scheduledDate = Carbon::create(2026, 1, $scheduledDay)->toDateString();
 
             // For Approved/Completed tasks, set completion_date to scheduled_date + end_time
@@ -377,6 +404,11 @@ class DatabaseSeeder extends Seeder
                 ]);
             }
         }
+
+        // =====================
+        // ROLES & PERMISSIONS
+        // =====================
+        $this->call(RolesAndPermissionsSeeder::class);
 
         // ... (Summary Output remains same)
         $this->command->info('✅ Fixed Seeder executed successfully!');

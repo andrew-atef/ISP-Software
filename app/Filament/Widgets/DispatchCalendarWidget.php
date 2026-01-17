@@ -24,6 +24,11 @@ class DispatchCalendarWidget extends CalendarWidget
 
     protected HtmlString|string|bool|null $heading = 'Dispatch Calendar';
 
+    public static function canView(): bool
+    {
+        return auth()->user()->can('View:DispatchCalendarWidget');
+    }
+
     public function getHeaderActions(): array
     {
         return [

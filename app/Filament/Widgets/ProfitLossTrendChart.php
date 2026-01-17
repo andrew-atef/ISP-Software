@@ -17,6 +17,11 @@ class ProfitLossTrendChart extends ChartWidget
 
     protected ?string $heading = 'Revenue vs Payroll (Trend)';
 
+    public static function canView(): bool
+    {
+        return auth()->user()->can('View:ProfitLossTrendChart');
+    }
+
     protected function getType(): string
     {
         return 'line';

@@ -15,6 +15,11 @@ class ProfitLossStats extends StatsOverviewWidget
 
     public ?string $endDate = null;
 
+    public static function canView(): bool
+    {
+        return auth()->user()->can('View:ProfitLossStats');
+    }
+
     protected function getColumns(): int
     {
         return 3;

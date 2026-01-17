@@ -26,6 +26,11 @@ class ProfitLossReport extends Page implements HasForms
 
     protected static ?string $title = 'Profit & Loss Report';
 
+    public static function canAccess(): bool
+    {
+        return auth()->user()->can('View:ProfitLossReport');
+    }
+
     protected string $view = 'filament.pages.profit-loss-report';
 
     public ?array $data = [];

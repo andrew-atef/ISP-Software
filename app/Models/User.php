@@ -2,15 +2,18 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\UserRole;
+use Spatie\Permission\Traits\HasRoles;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-class User extends Authenticatable
+class User extends Authenticatable implements FilamentUser
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, \Illuminate\Database\Eloquent\SoftDeletes;
+    use HasFactory, Notifiable, \Illuminate\Database\Eloquent\SoftDeletes, HasRoles;
 
     /**
      * The attributes that are mass assignable.
@@ -110,5 +113,24 @@ class User extends Authenticatable
             ->where('completion_date', '>=', $start)
             ->whereNull('payroll_id') // Exclude tasks already assigned to payroll
             ->sum('tech_price');
+    }
+
+    /**
+     * Determine if user can access the Filament Admin Panel.
+     *
+     * Business Rules:
+     * - Admins: Full access to dashboard
+     * - Dispatchers: Full access to dashboard
+     * - Technicians: NO access (must use PWA/Mobile App)
+     */
+    public function canAccessPanel(Panel $panel): bool
+    {
+        // Technicians are not allowed to access the Admin Panel
+        if ($this->role === UserRole::Tech) {
+            return false;
+        }
+
+        // Admins and Dispatchers have access
+        return in_array($this->role, [UserRole::Admin, UserRole::Dispatch]);
     }
 }

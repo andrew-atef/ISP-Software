@@ -17,4 +17,9 @@ class DispatchCalendar extends Page
     protected static ?string $title = 'Dispatch Calendar';
 
     protected string $view = 'filament.pages.dispatch-calendar';
+
+    public static function canAccess(): bool
+    {
+        return auth()->user()->can('View:DispatchCalendar');
+    }
 }

@@ -2,6 +2,11 @@
 
 namespace App\Providers;
 
+use App\Models\Task;
+use App\Models\User;
+use App\Observers\TaskObserver;
+use App\Observers\UserObserver;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -19,6 +24,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        \App\Models\Task::observe(\App\Observers\TaskObserver::class);
+        // Global Gate bypass for super_admin role (God Mode)
+        Gate::before(static function ($user, $ability) {
+            return $user->hasRole('super_admin') ? true : null;
+        });
+
+        User::observe(UserObserver::class);
+        Task::observe(TaskObserver::class);
     }
 }

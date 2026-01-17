@@ -21,9 +21,10 @@ class TodayTasks extends Page implements HasTable
 {
     use InteractsWithTable;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-calendar';
-
-    protected static string|\UnitEnum|null $navigationGroup = 'Dashboard';
+        public static function canAccess(): bool
+        {
+            return auth()->user()->can('View:TodayTasks');
+        }
 
     protected static ?string $title = 'Today\'s Tasks';
 

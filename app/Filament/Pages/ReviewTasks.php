@@ -23,9 +23,10 @@ class ReviewTasks extends Page implements HasTable
 {
     use InteractsWithTable;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-clipboard-document-check';
-
-    protected static string|\UnitEnum|null $navigationGroup = 'Dashboard';
+        public static function canAccess(): bool
+        {
+            return auth()->user()->can('View:ReviewTasks');
+        }
 
     protected static ?string $title = 'Review Completed Tasks';
 
