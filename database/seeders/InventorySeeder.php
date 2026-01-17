@@ -58,7 +58,7 @@ class InventorySeeder extends Seeder
         // =====================
         // UNTRACKED ITEMS (is_tracked = false)
         // =====================
-        
+
         // CABLES
         InventoryItem::firstOrCreate(
             ['sku' => 'FIBER-TERM-TAIL'],

@@ -54,20 +54,20 @@ class TaskForm
                             ->seconds(false),
                         TimePicker::make('time_slot_end')
                             ->seconds(false),
-                        
+
                         Select::make('original_tech_id')
                             ->label('Original Tech (Wire3)')
                             ->relationship('originalTech', 'name')
                             ->searchable()
                             ->preload()
                             ->required(),
-                        
+
                         Select::make('assigned_tech_id')
                             ->relationship('assignedTech', 'name', fn ($query) => $query->where('role', \App\Enums\UserRole::Tech))
                             ->searchable()
                             ->preload()
                             ->live()
-                            ->afterStateUpdated(fn ($state, $set) => 
+                            ->afterStateUpdated(fn ($state, $set) =>
                                 $state ? $set('status', TaskStatus::Assigned) : $set('status', TaskStatus::Pending)
                             ),
 
@@ -168,7 +168,7 @@ class TaskForm
         // Apply Override Logic
         // If NotBillable -> Force company_price to 0 (Keep tech_price as Base).
         // Else -> Set company_price to Base.
-        
+
         if ($financialStatusValue === TaskFinancialStatus::NotBillable->value) {
             $set('company_price', 0);
         } else {
