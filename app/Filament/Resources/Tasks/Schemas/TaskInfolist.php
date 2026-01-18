@@ -149,6 +149,7 @@ class TaskInfolist
                         ImageEntry::make('media.file_path')
                             ->label('')
                             ->disk('public')
+                            ->visibility('public')
                             ->height(200)
                             ->width(250)
                             ->stacked()

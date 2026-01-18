@@ -1,0 +1,728 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "XConnect API",
+        "version": "1.0.0"
+    },
+    "paths": {
+        "/api/login": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Authenticate technician and issue Sanctum token",
+                "operationId": "222b2625838e3c57e017987f73598fda",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "email",
+                                    "password",
+                                    "device_name"
+                                ],
+                                "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email"
+                                    },
+                                    "password": {
+                                        "type": "string",
+                                        "format": "password"
+                                    },
+                                    "device_name": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "token": {
+                                            "type": "string"
+                                        },
+                                        "user": {
+                                            "$ref": "#/components/schemas/User"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    },
+                    "403": {
+                        "description": "Forbidden (non-tech role)"
+                    }
+                }
+            }
+        },
+        "/api/bootstrap": {
+            "get": {
+                "tags": [
+                    "Bootstrap"
+                ],
+                "summary": "Offline bootstrap for technician app",
+                "operationId": "9bbff3ec0f58a5b1f36b791edb0b0bea",
+                "responses": {
+                    "200": {
+                        "description": "Bootstrap payload",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "user": {
+                                            "$ref": "#/components/schemas/User"
+                                        },
+                                        "inventory_wallet": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/WalletItem"
+                                            }
+                                        },
+                                        "inventory_catalog": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/InventoryItem"
+                                            }
+                                        },
+                                        "tasks": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Task"
+                                            }
+                                        },
+                                        "constants": {
+                                            "properties": {
+                                                "task_types": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/EnumOption"
+                                                    }
+                                                },
+                                                "task_statuses": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/EnumOption"
+                                                    }
+                                                },
+                                                "installation_types": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/EnumOption"
+                                                    }
+                                                },
+                                                "inventory_item_types": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/EnumOption"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/tasks/{id}/start": {
+            "post": {
+                "tags": [
+                    "Tasks"
+                ],
+                "summary": "Start working on a task",
+                "operationId": "f8aa83def8cf0fc07f0f3e98bc1f2094",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "lat",
+                                    "lng"
+                                ],
+                                "properties": {
+                                    "lat": {
+                                        "type": "number",
+                                        "format": "float"
+                                    },
+                                    "lng": {
+                                        "type": "number",
+                                        "format": "float"
+                                    },
+                                    "timestamp": {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Task started"
+                    },
+                    "403": {
+                        "description": "Not assigned to this task"
+                    },
+                    "404": {
+                        "description": "Task not found"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/tasks/{id}/pause": {
+            "post": {
+                "tags": [
+                    "Tasks"
+                ],
+                "summary": "Pause a started task",
+                "operationId": "3b922530a3e2d5ac05235ee7fe963bb8",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "reason"
+                                ],
+                                "properties": {
+                                    "reason": {
+                                        "type": "string"
+                                    },
+                                    "lat": {
+                                        "type": "number",
+                                        "format": "float",
+                                        "nullable": true
+                                    },
+                                    "lng": {
+                                        "type": "number",
+                                        "format": "float",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Task paused"
+                    },
+                    "400": {
+                        "description": "Task not started"
+                    },
+                    "403": {
+                        "description": "Not authorized"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/tasks/{id}/media": {
+            "post": {
+                "tags": [
+                    "Tasks"
+                ],
+                "summary": "Upload task media (photo)",
+                "operationId": "59086f07997b4d5120379c8fe47b93fa",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "required": [
+                                    "file",
+                                    "type"
+                                ],
+                                "properties": {
+                                    "file": {
+                                        "description": "Image file (JPEG/PNG, max 10MB)",
+                                        "type": "string",
+                                        "format": "binary"
+                                    },
+                                    "type": {
+                                        "description": "Media type classification",
+                                        "type": "string",
+                                        "enum": [
+                                            "work",
+                                            "bury",
+                                            "bore",
+                                            "general"
+                                        ]
+                                    },
+                                    "watermark_meta": {
+                                        "description": "JSON-encoded watermark metadata (location, timestamp, etc.)",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Media uploaded successfully"
+                    },
+                    "403": {
+                        "description": "Not authorized to upload media for this task"
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/tasks/{id}/complete": {
+            "post": {
+                "tags": [
+                    "Tasks"
+                ],
+                "summary": "Mark task as completed with full details and inventory consumption",
+                "operationId": "d8ab1acebf231b98ac0f2d6758fc485d",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Task ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 16
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "end_lat",
+                                    "end_lng",
+                                    "installation_type",
+                                    "drop_bury_status",
+                                    "sidewalk_bore_status"
+                                ],
+                                "properties": {
+                                    "end_lat": {
+                                        "description": "End location latitude (-90 to 90)",
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 40.7128
+                                    },
+                                    "end_lng": {
+                                        "description": "End location longitude (-180 to 180)",
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": -74.006
+                                    },
+                                    "installation_type": {
+                                        "description": "Installation method used",
+                                        "type": "string",
+                                        "enum": [
+                                            "aerial",
+                                            "underground",
+                                            "combination",
+                                            "mdu"
+                                        ],
+                                        "example": "aerial"
+                                    },
+                                    "drop_bury_status": {
+                                        "description": "Was drop bury completed?",
+                                        "type": "boolean",
+                                        "example": true
+                                    },
+                                    "sidewalk_bore_status": {
+                                        "description": "Was sidewalk bore performed?",
+                                        "type": "boolean",
+                                        "example": false
+                                    },
+                                    "ont_serial": {
+                                        "description": "ONT serial number",
+                                        "type": "string",
+                                        "example": "ONT123456",
+                                        "nullable": true
+                                    },
+                                    "eero_serial_1": {
+                                        "description": "First Eero device serial",
+                                        "type": "string",
+                                        "example": "EERO001",
+                                        "nullable": true
+                                    },
+                                    "eero_serial_2": {
+                                        "description": "Second Eero device serial",
+                                        "type": "string",
+                                        "example": null,
+                                        "nullable": true
+                                    },
+                                    "eero_serial_3": {
+                                        "description": "Third Eero device serial",
+                                        "type": "string",
+                                        "example": null,
+                                        "nullable": true
+                                    },
+                                    "tech_notes": {
+                                        "description": "Technician completion notes",
+                                        "type": "string",
+                                        "example": "Installation completed without issues",
+                                        "nullable": true
+                                    },
+                                    "inventory_used": {
+                                        "description": "Inventory items consumed during task",
+                                        "type": "array",
+                                        "items": {
+                                            "properties": {
+                                                "item_id": {
+                                                    "description": "Inventory item ID",
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "quantity": {
+                                                    "description": "Quantity consumed (positive integer)",
+                                                    "type": "integer",
+                                                    "example": 1
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "example": [
+                                            {
+                                                "item_id": 1,
+                                                "quantity": 1
+                                            }
+                                        ],
+                                        "nullable": true
+                                    },
+                                    "timestamp": {
+                                        "description": "Offline completion timestamp (ISO 8601)",
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "example": "2026-01-19T14:30:00Z",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Task completed successfully, inventory deducted"
+                    },
+                    "403": {
+                        "description": "Not authorized to complete this task"
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "EnumOption": {
+                "properties": {
+                    "label": {
+                        "type": "string"
+                    },
+                    "value": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "InventoryItem": {
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "sku": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "type": "string"
+                    },
+                    "is_tracked": {
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "Task": {
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "task_type": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "financial_status": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "scheduled_date": {
+                        "type": "string",
+                        "format": "date",
+                        "nullable": true
+                    },
+                    "time_slot_start": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "time_slot_end": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "description": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "saf_link": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "customer": {
+                        "properties": {
+                            "id": {
+                                "type": "integer",
+                                "nullable": true
+                            },
+                            "name": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "address": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "phone": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "lat": {
+                                "type": "number",
+                                "format": "float",
+                                "nullable": true
+                            },
+                            "lng": {
+                                "type": "number",
+                                "format": "float",
+                                "nullable": true
+                            }
+                        },
+                        "type": "object"
+                    },
+                    "original_tech": {
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "code": {
+                                "type": "string"
+                            }
+                        },
+                        "type": "object",
+                        "nullable": true
+                    },
+                    "detail": {
+                        "properties": {
+                            "ont_serial": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "eero_serial_1": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "eero_serial_2": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "eero_serial_3": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "drop_bury_status": {
+                                "type": "boolean",
+                                "nullable": true
+                            },
+                            "sidewalk_bore_status": {
+                                "type": "boolean",
+                                "nullable": true
+                            },
+                            "tech_notes": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "start_time_actual": {
+                                "type": "string",
+                                "format": "date-time",
+                                "nullable": true
+                            },
+                            "end_time_actual": {
+                                "type": "string",
+                                "format": "date-time",
+                                "nullable": true
+                            }
+                        },
+                        "type": "object",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "User": {
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "email": {
+                        "type": "string"
+                    },
+                    "phone": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "current_week_earnings": {
+                        "type": "number",
+                        "format": "float"
+                    },
+                    "avatar_url": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "WalletItem": {
+                "properties": {
+                    "item_id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "quantity": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            }
+        },
+        "securitySchemes": {
+            "BearerAuth": {
+                "type": "http",
+                "description": "Use Sanctum bearer token from /api/login",
+                "bearerFormat": "JWT",
+                "scheme": "bearer"
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Auth",
+            "description": "Auth"
+        },
+        {
+            "name": "Bootstrap",
+            "description": "Bootstrap"
+        },
+        {
+            "name": "Tasks",
+            "description": "Tasks"
+        }
+    ]
+}
