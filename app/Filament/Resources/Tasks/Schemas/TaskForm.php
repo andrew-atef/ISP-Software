@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Tasks\Schemas;
 
 
+use App\Enums\InstallationType;
 use App\Enums\TaskFinancialStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
@@ -92,6 +93,7 @@ class TaskForm
                 Section::make('Financials')
                     ->columnSpanFull()
                     ->columns(3)
+                    ->visible(fn () => auth()->user()->hasRole('super_admin'))
                     ->schema([
                         Select::make('financial_status')
                             ->options(TaskFinancialStatus::class)
@@ -118,10 +120,21 @@ class TaskForm
                 // Section 4: Inventory Consumption (Tracked Items Only)
                 Section::make('Inventory Consumption')
                     ->columnSpanFull()
-                    ->description('Select major devices (ONTs, Eeros) installed during this task.')
+                    ->description('Select major devices (ONTs, Eeros) installed during this task. (Tech reports via App only)')
+                    ->hiddenOn('create')
                     ->schema([
+                        // Installation Type - Field-reported data (Editable by Super Admin only)
+                        Select::make('installation_type')
+                            ->label('Installation Type')
+                            ->helperText('Reported by technician via mobile app')
+                            ->options(InstallationType::class)
+                            ->disabled(fn () => ! auth()->user()->hasRole('super_admin'))
+                            ->dehydrated()
+                            ->hiddenOn('create'),
+
                         Repeater::make('inventory_consumption')
                             ->relationship('inventoryConsumptions')
+                            ->disabled()
                             ->schema([
                                 Select::make('inventory_item_id')
                                     ->label('Device')

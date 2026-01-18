@@ -7,10 +7,12 @@ use App\Enums\TaskStatus;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class Payroll extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity;
 
     protected $fillable = [
         'user_id',
@@ -32,6 +34,23 @@ class Payroll extends Model
         'net_pay' => 'decimal:2',
         'status' => PayrollStatus::class,
     ];
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->useLogName('payroll')
+            ->logOnly([
+                'status',
+                'gross_amount',
+                'bonus_amount',
+                'deductions_amount',
+                'deduction_override',
+                'net_pay',
+            ])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn (string $eventName) => "Payroll {$eventName}");
+    }
 
     public function user(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {

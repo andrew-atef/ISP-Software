@@ -73,9 +73,13 @@ class TaskInfolist
                                     }),
                                 TextEntry::make('task_type')
                                     ->badge(),
+                                TextEntry::make('installation_type')
+                                    ->label('Installation Type')
+                                    ->badge(),
                                 TextEntry::make('financial_status')
                                     ->badge()
-                                    ->color(fn($state): string => $state?->value === 'billable' ? 'success' : 'gray'),
+                                    ->color(fn($state): string => $state?->value === 'billable' ? 'success' : 'gray')
+                                    ->visible(fn () => auth()->user()->hasRole('super_admin')),
                             ]),
 
                         // =====================
@@ -86,6 +90,10 @@ class TaskInfolist
                             ->columnSpan(2)
                             ->columns(2)
                             ->schema([
+                                TextEntry::make('installation_type')
+                                    ->label('Installation Type')
+                                    ->badge()
+                                    ->placeholder('Not yet reported'),
                                 TextEntry::make('detail.ont_serial')
                                     ->label('ONT')
                                     ->placeholder('Not scanned')
@@ -169,10 +177,12 @@ class TaskInfolist
                             ->trueColor('warning'),
                         TextEntry::make('company_price')
                             ->label('Company Price')
-                            ->money('USD'),
+                            ->money('USD')
+                            ->visible(fn () => auth()->user()->hasRole('super_admin')),
                         TextEntry::make('tech_price')
                             ->label('Tech Price')
-                            ->money('USD'),
+                            ->money('USD')
+                            ->visible(fn () => auth()->user()->hasRole('super_admin')),
                         TextEntry::make('completion_date')
                             ->label('Completed At')
                             ->dateTime(),

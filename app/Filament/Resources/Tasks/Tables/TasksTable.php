@@ -86,6 +86,10 @@ class TasksTable
                         TaskType::ServiceCall => 'info',
                         TaskType::ServiceChange => 'gray',
                     }),
+                TextColumn::make('installation_type')
+                    ->label('Installation')
+                    ->badge()
+                    ->toggleable(),
                 TextColumn::make('status')
                     ->badge()
                     ->color(fn(TaskStatus $state): string => match ($state) {
@@ -111,12 +115,14 @@ class TasksTable
                     ->trueColor('warning')
                     ->falseColor('gray'),
                 TextColumn::make('financial_status')
-                    ->badge(),
+                    ->badge()
+                    ->visible(fn () => auth()->user()->hasRole('super_admin')),
                 TextColumn::make('tech_price')
                     ->label('Tech Pay')
                     ->money('USD')
                     ->sortable()
-                    ->toggleable(),
+                    ->toggleable()
+                    ->visible(fn () => auth()->user()->hasRole('super_admin')),
             ])
             ->filters([
                 SelectFilter::make('status')

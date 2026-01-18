@@ -2,20 +2,24 @@
 
 namespace App\Models;
 
-use Carbon\Carbon;
+use App\Enums\InstallationType;
 use App\Enums\TaskFinancialStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
+use Carbon\Carbon;
 use Guava\Calendar\Contracts\Eventable;
 use Guava\Calendar\ValueObjects\CalendarEvent;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Models\Activity;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class Task extends Model implements Eventable
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, LogsActivity, SoftDeletes;
 
     protected $fillable = [
         'customer_id',
@@ -23,6 +27,7 @@ class Task extends Model implements Eventable
         'original_tech_id',
         'assigned_tech_id',
         'task_type',
+        'installation_type',
         'status',
         'financial_status',
         'company_price',
@@ -41,6 +46,7 @@ class Task extends Model implements Eventable
 
     protected $casts = [
         'task_type' => TaskType::class,
+        'installation_type' => InstallationType::class,
         'status' => TaskStatus::class,
         'financial_status' => TaskFinancialStatus::class,
         'company_price' => 'decimal:2',
@@ -49,6 +55,26 @@ class Task extends Model implements Eventable
         'completion_date' => 'datetime',
         'is_offline_sync' => 'boolean',
     ];
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->useLogName('task')
+            ->logOnly([
+                'status',
+                'financial_status',
+                'company_price',
+                'tech_price',
+                'assigned_tech_id',
+                'scheduled_date',
+                'completion_date',
+                'payroll_id',
+                'company_invoice_id',
+            ])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn (string $eventName) => "Task {$eventName}");
+    }
 
     // Relations
 
@@ -85,6 +111,11 @@ class Task extends Model implements Eventable
     public function media()
     {
         return $this->hasMany(TaskMedia::class);
+    }
+
+    public function activities()
+    {
+        return $this->morphMany(Activity::class, 'subject')->latest();
     }
 
     public function inventoryTransactions()
