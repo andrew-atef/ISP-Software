@@ -14,12 +14,15 @@ class InventoryRequest extends Model
         'user_id',
         'requested_by',
         'status',
+        'pickup_date',
+        'pickup_location',
         'notes',
         'approved_at',
         'approved_by',
     ];
 
     protected $casts = [
+        'pickup_date' => 'date',
         'approved_at' => 'datetime',
     ];
 

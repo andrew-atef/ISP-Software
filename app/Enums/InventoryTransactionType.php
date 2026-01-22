@@ -8,4 +8,6 @@ enum InventoryTransactionType: string
     case Transfer = 'transfer';
     case Consumed = 'consumed';
     case Return = 'return';
+    case TransferIn = 'transfer_in';
+    case TransferOut = 'transfer_out';
 }
