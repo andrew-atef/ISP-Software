@@ -8,6 +8,7 @@ use Filament\Actions\Action;
 use Filament\Infolists\Components\IconEntry;
 use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\TextEntry;
+use Illuminate\Database\Eloquent\Collection;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -119,7 +120,7 @@ class TaskInfolist
                                     ->trueColor('success')
                                     ->falseColor('danger'),
                                 IconEntry::make('detail.sidewalk_bore_status')
-                                    ->label('Bore Done?')
+                                    ->label('Sidewalk Bore Done?')
                                     ->boolean()
                                     ->trueIcon('heroicon-o-check-circle')
                                     ->falseIcon('heroicon-o-x-circle')
@@ -140,22 +141,63 @@ class TaskInfolist
                     ]),
 
                 // =====================
-                // SECTION 3: Photo Gallery (Full Width)
+                // SECTION 3: Photo Gallery (Full Width, Grouped by Type)
                 // =====================
                 Section::make('Photo Gallery')
                     ->icon('heroicon-o-photo')
                     ->columnSpanFull()
                     ->schema([
-                        ImageEntry::make('media.file_path')
-                            ->label('')
-                            ->disk('public')
-                            ->visibility('public')
-                            ->height(200)
-                            ->width(250)
-                            ->stacked()
-                            ->circular(false)
+                        // Work Photos
+                        Section::make('Work Photos')
+                            ->icon('heroicon-o-wrench-screwdriver')
+                            ->description('Installation and site photos')
                             ->columnSpanFull()
-                            ->placeholder('No photos uploaded for this task.'),
+                            ->schema([
+                                Grid::make(2)
+                                    ->schema(fn ($record) => self::getPhotoEntries($record, 'work'))
+                                    ->columnSpanFull(),
+                            ])
+                            ->collapsible()
+                            ->collapsed(fn ($record) => $record->media()->where('type', 'work')->count() === 0),
+
+                        // Bury Photos
+                        Section::make('Bury Photos')
+                            ->icon('heroicon-o-arrow-down')
+                            ->description('Cable burial photos')
+                            ->columnSpanFull()
+                            ->schema([
+                                Grid::make(2)
+                                    ->schema(fn ($record) => self::getPhotoEntries($record, 'bury'))
+                                    ->columnSpanFull(),
+                            ])
+                            ->collapsible()
+                            ->collapsed(fn ($record) => $record->media()->where('type', 'bury')->count() === 0),
+
+                        // Bore Photos
+                        Section::make('Bore Photos')
+                            ->icon('heroicon-o-arrow-down')
+                            ->description('Sidewalk bore photos')
+                            ->columnSpanFull()
+                            ->schema([
+                                Grid::make(2)
+                                    ->schema(fn ($record) => self::getPhotoEntries($record, 'bore'))
+                                    ->columnSpanFull(),
+                            ])
+                            ->collapsible()
+                            ->collapsed(fn ($record) => $record->media()->where('type', 'bore')->count() === 0),
+
+                        // General Photos
+                        Section::make('General Photos')
+                            ->icon('heroicon-o-camera')
+                            ->description('Other site photos')
+                            ->columnSpanFull()
+                            ->schema([
+                                Grid::make(2)
+                                    ->schema(fn ($record) => self::getPhotoEntries($record, 'general'))
+                                    ->columnSpanFull(),
+                            ])
+                            ->collapsible()
+                            ->collapsed(fn ($record) => $record->media()->where('type', 'general')->count() === 0),
                     ]),
 
                 // =====================
@@ -195,5 +237,37 @@ class TaskInfolist
                             ->dateTime(),
                     ]),
             ]);
+    }
+
+    private static function getPhotoEntries(Task $record, string $type): array
+    {
+        $photos = $record->media()->where('type', $type)->get();
+
+        if ($photos->isEmpty()) {
+            return [];
+        }
+
+        $entries = [];
+        foreach ($photos as $photo) {
+            // Use watermarked photo if watermark_data exists, otherwise use original
+            $photoUrl = $photo->watermark_data
+                ? route('photos.watermarked', $photo->id)
+                : asset('storage/' . $photo->file_path);
+
+            $entries[] = ImageEntry::make('photo_' . $photo->id)
+                ->label($photo->taken_at?->format('M d, Y H:i') ?? 'Photo')
+                ->getStateUsing(fn () => $photo->file_path)
+                ->disk('public')
+                ->columnSpan(1)
+                ->height('auto')
+                ->extraImgAttributes([
+                    'style' => 'width: 100%; height: auto; object-fit: cover; cursor: pointer;',
+                    'data-glightbox' => 'gallery=' . $type,
+                    'data-gallery' => $type,
+                    'href' => $photoUrl,
+                ]);
+        }
+
+        return $entries;
     }
 }

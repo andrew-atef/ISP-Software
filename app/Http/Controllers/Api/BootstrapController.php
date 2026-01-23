@@ -74,7 +74,7 @@ class BootstrapController extends Controller
 
         $cutoffDate = Carbon::now()->addDays(7)->toDateString();
 
-        // Fetch actionable tasks: Assigned, Started, Paused, ReturnedForFix, and today's Completed (for reference)
+        // Fetch actionable tasks: Assigned, Started, Paused, ReturnedForFix, and Completed (for reference)
         $tasks = Task::with(['customer', 'originalTech', 'detail'])
             ->where('assigned_tech_id', $user->id)
             ->where(function ($query) {
@@ -83,12 +83,8 @@ class BootstrapController extends Controller
                     TaskStatus::Started,
                     TaskStatus::Paused,
                     TaskStatus::ReturnedForFix,
-                ])
-                ->orWhere(function ($q) {
-                    // Include today's completed tasks for reference
-                    $q->where('status', TaskStatus::Completed)
-                        ->whereDate('completion_date', Carbon::today());
-                });
+                    TaskStatus::Completed,
+                ]);
             })
             ->where(function ($query) use ($cutoffDate) {
                 $query->whereDate('scheduled_date', '<=', $cutoffDate)

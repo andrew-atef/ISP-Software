@@ -52,9 +52,24 @@ class TaskForm
                             ->default(now()->addDay())
                             ->required(),
                         TimePicker::make('time_slot_start')
-                            ->seconds(false),
+                            ->seconds(false)
+                            ->live()
+                            ->afterStateUpdated(function ($state, $set, $get) {
+                                $end = $get('time_slot_end');
+                                if ($state && $end && $state >= $end) {
+                                    $set('time_slot_end', null);
+                                }
+                            }),
                         TimePicker::make('time_slot_end')
-                            ->seconds(false),
+                            ->seconds(false)
+                            ->rules([
+                                fn ($get) => function ($attribute, $value, $fail) use ($get) {
+                                    $start = $get('time_slot_start');
+                                    if ($start && $value && $value <= $start) {
+                                        $fail('End time must be after start time.');
+                                    }
+                                },
+                            ]),
 
                         Select::make('original_tech_id')
                             ->label('Original Tech (Wire3)')

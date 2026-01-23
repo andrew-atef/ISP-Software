@@ -64,4 +64,17 @@ class TaskResource extends Resource
                 SoftDeletingScope::class,
             ]);
     }
+
+    public static function getHeadComponents(): array
+    {
+        return [
+            ...parent::getHeadComponents(),
+            // GLightbox CSS
+            \Illuminate\View\Component::make('html.tag', [
+                'tag' => 'link',
+                'rel' => 'stylesheet',
+                'href' => 'https://cdn.jsdelivr.net/npm/glightbox/dist/css/glightbox.css',
+            ]),
+        ];
+    }
 }

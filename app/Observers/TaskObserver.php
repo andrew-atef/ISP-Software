@@ -2,13 +2,16 @@
 
 namespace App\Observers;
 
+use App\Enums\InstallationType;
 use App\Enums\TaskFinancialStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\JobPrice;
 use App\Models\Task;
+use App\Models\TaskDetail;
 use App\Models\InventoryTransaction;
 use App\Models\InventoryWallet;
+use Illuminate\Support\Facades\DB;
 
 class TaskObserver
 {
@@ -114,6 +117,12 @@ class TaskObserver
             return;
         }
 
+        // If install type is Aerial or MDU, no DropBury child should be created
+        $installType = $task->installation_type ?? $detail->installation_type ?? null;
+        if (in_array($installType, [InstallationType::Aerial, InstallationType::MDU], true)) {
+            return;
+        }
+
         // If drop_bury_status is TRUE (Bury done): Job fully complete, do nothing
         if ($detail->drop_bury_status === true) {
             return;
@@ -133,43 +142,69 @@ class TaskObserver
         }
 
         // =====================
-        // SUB-TASK GENERATION
+        // SUB-TASK GENERATION (AFTER COMMIT)
         // =====================
 
-        // Fetch the standard DropBury rate from JobPrice
-        $dropBuryPrice = JobPrice::where('task_type', TaskType::DropBury)->first();
-        $techPrice = (float) ($dropBuryPrice?->tech_price ?? 0.00);
+        DB::afterCommit(function () use ($task) {
+            $freshTask = Task::with('detail')->find($task->id);
 
-        // Create the DropBury sub-task (The Child)
-        Task::create([
-            // Relationships
-            'parent_task_id' => $task->id,
-            'customer_id' => $task->customer_id,
+            if (!$freshTask || !$freshTask->detail) {
+                return;
+            }
 
-            // Assignment: null for Dispatcher to re-assign
-            'assigned_tech_id' => null,
-            'original_tech_id' => $task->original_tech_id,
+            $freshDetail = $freshTask->detail;
 
-            // Task Type & Status
-            'task_type' => TaskType::DropBury,
-            'status' => TaskStatus::Pending,
+            // Re-check install type rules after reload
+            $installType = $freshTask->installation_type ?? $freshDetail->installation_type ?? null;
+            if (in_array($installType, [InstallationType::Aerial, InstallationType::MDU], true)) {
+                return;
+            }
 
-            // Financials (CRITICAL)
-            // Parent task bills the $350, this child is cost-only
-            'financial_status' => TaskFinancialStatus::NotBillable,
-            'company_price' => 0.00,
-            'tech_price' => $techPrice,
+            // Re-check drop bury status after reload
+            if ($freshDetail->drop_bury_status === true) {
+                return;
+            }
 
-            // Scheduling: inherit parent's scheduled date, no specific time
-            'scheduled_date' => $task->scheduled_date,
-            'time_slot_start' => null,
-            'time_slot_end' => null,
+            // Prevent duplicates
+            $exists = Task::where('parent_task_id', $freshTask->id)
+                ->where('task_type', TaskType::DropBury)
+                ->exists();
 
-            // Metadata
-            'description' => "Auto-generated DropBury sub-task for Task #{$task->id}",
-            'saf_link' => $task->saf_link,
-            'import_batch_id' => $task->import_batch_id,
-        ]);
+            if ($exists) {
+                return;
+            }
+
+            // Pricing
+            $dropBuryPrice = JobPrice::where('task_type', TaskType::DropBury)->first();
+            $techPrice = (float) ($dropBuryPrice?->tech_price ?? 0.00);
+
+            // Create child task
+            $dropBuryTask = Task::create([
+                'parent_task_id' => $freshTask->id,
+                'customer_id' => $freshTask->customer_id,
+                'assigned_tech_id' => null,
+                'original_tech_id' => $freshTask->original_tech_id,
+                'task_type' => TaskType::DropBury,
+                'status' => TaskStatus::Pending,
+                'financial_status' => TaskFinancialStatus::NotBillable,
+                'company_price' => 0.00,
+                'tech_price' => $techPrice,
+                'scheduled_date' => $freshTask->scheduled_date,
+                'time_slot_start' => null,
+                'time_slot_end' => null,
+                'description' => "Auto-generated DropBury sub-task for Task #{$freshTask->id}",
+                'saf_link' => $freshTask->saf_link,
+                'import_batch_id' => $freshTask->import_batch_id,
+            ]);
+
+            // Copy tech notes from parent task detail if present
+            if ($freshDetail->tech_notes) {
+                TaskDetail::updateOrCreate(
+                    ['task_id' => $dropBuryTask->id],
+                    ['tech_notes' => $freshDetail->tech_notes]
+                );
+            }
+        });
     }
 
     /**

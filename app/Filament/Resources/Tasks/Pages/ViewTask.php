@@ -92,9 +92,26 @@ class ViewTask extends ViewRecord
                         ->warning()
                         ->send();
                 }),
-
             // Standard Edit Action
             EditAction::make(),
+        ];
+    }
+
+    public function getHeadComponents(): array
+    {
+        return [
+            ...parent::getHeadComponents(),
+            // GLightbox CSS
+            view('components.glightbox-css'),
+        ];
+    }
+
+    public function getFooterComponents(): array
+    {
+        return [
+            ...parent::getFooterComponents(),
+            // GLightbox JS
+            view('components.glightbox-js'),
         ];
     }
 }

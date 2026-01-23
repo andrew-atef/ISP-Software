@@ -20,6 +20,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Intervention\Image\ImageManager;
+use Intervention\Image\Drivers\Gd\Driver;
 use OpenApi\Attributes as OA;
 
 class TaskExecutionController extends Controller
@@ -186,7 +188,6 @@ class TaskExecutionController extends Controller
         }
 
         $file = $request->file('file');
-        $path = $file->store("task-media/{$task->id}", 'public');
 
         // Safely parse watermark metadata JSON
         $watermarkData = null;
@@ -197,6 +198,119 @@ class TaskExecutionController extends Controller
             }
         }
 
+        // Read image and add watermark if metadata exists
+        $tempPath = $file->store('temp', 'local');
+        $fullPath = Storage::disk('local')->path($tempPath);
+
+        // Load image using GD directly
+        $image = imagecreatefromjpeg($fullPath);
+        if ($image === false) {
+            // Try PNG
+            $image = imagecreatefrompng($fullPath);
+        }
+        if ($image === false) {
+            return response()->json(['message' => 'Invalid image file.'], 422);
+        }
+
+        if ($watermarkData) {
+            $timestamp = $watermarkData['timestamp'] ?? '';
+            $location = $watermarkData['location'] ?? '';
+
+            // Format watermark text
+            $watermarkText = trim($timestamp . "\n" . $location);
+
+            // Get image dimensions
+            $width = imagesx($image);
+            $height = imagesy($image);
+
+            // Define colors
+            $white = imagecolorallocate($image, 255, 255, 255);
+            $black = imagecolorallocate($image, 0, 0, 0);
+
+            // Use TTF font with readable size (1/30 of image width)
+            $fontSize = max(4, intval($width / 30));
+            $fontPath = public_path('fonts/arial.ttf');
+
+            // If font doesn't exist, try alternative
+            if (!file_exists($fontPath)) {
+                $fontPath = __DIR__ . '/../../../public/fonts/arial.ttf';
+            }
+
+            // If still doesn't exist, use a basic font file
+            if (!file_exists($fontPath)) {
+                $fontPath = 'C:\Windows\Fonts\arial.ttf'; // Windows path
+            }
+
+            // Check if we can use TTF
+            if (file_exists($fontPath)) {
+                // Position: left side, moved up from bottom
+                $textX = 20;
+                $textY = $height - 120;
+
+                // Draw each line with black shadow
+                $lines = explode("\n", $watermarkText);
+                $lineOffset = 0;
+
+                foreach ($lines as $line) {
+                    // Draw black outline (shadow effect)
+                    for ($offsetX = -2; $offsetX <= 2; $offsetX++) {
+                        for ($offsetY = -2; $offsetY <= 2; $offsetY++) {
+                            if ($offsetX != 0 || $offsetY != 0) {
+                                imagettftext($image, $fontSize, 0, $textX + $offsetX, $textY + $offsetY + $lineOffset, $black, $fontPath, $line);
+                            }
+                        }
+                    }
+                    // Draw white text on top
+                    imagettftext($image, $fontSize, 0, $textX, $textY + $lineOffset, $white, $fontPath, $line);
+                    $lineOffset += $fontSize + 5;
+                }
+            } else {
+                // Fallback to built-in font if TTF not found
+                $fontSize = 5;
+                $fontHeight = 20;
+                $fontWidth = 12;
+
+                // Calculate text dimensions
+                $lines = explode("\n", $watermarkText);
+                $textWidth = max(array_map(function($line) use ($fontWidth) {
+                    return strlen($line) * $fontWidth;
+                }, $lines));
+
+                // Position: left side
+                $textX = 20;
+                $textY = $height - ($fontHeight * count($lines)) - 20;
+
+                // Draw each line with shadow effect
+                $lineY = $textY;
+                foreach ($lines as $line) {
+                    // Draw black outline (shadow effect)
+                    for ($offsetX = -3; $offsetX <= 3; $offsetX++) {
+                        for ($offsetY = -3; $offsetY <= 3; $offsetY++) {
+                            if ($offsetX != 0 || $offsetY != 0) {
+                                imagestring($image, $fontSize, $textX + $offsetX, $lineY + $offsetY, $line, $black);
+                            }
+                        }
+                    }
+                    // Draw white text on top
+                    imagestring($image, $fontSize, $textX, $lineY, $line, $white);
+                    $lineY += $fontHeight;
+                }
+            }
+        }
+
+        // Save the (possibly watermarked) image to storage
+        $filename = uniqid() . '.' . $file->getClientOriginalExtension();
+        $path = "task-media/{$task->id}/" . $filename;
+
+        // Create a temporary output file
+        $outputPath = Storage::disk('local')->path('temp/' . $filename);
+        imagejpeg($image, $outputPath, 95);
+        imagedestroy($image);
+
+        // Move to public storage
+        Storage::disk('public')->put($path, file_get_contents($outputPath));
+        Storage::disk('local')->delete('temp/' . $filename);
+        Storage::disk('local')->delete($tempPath);
         TaskMedia::create([
             'task_id' => $task->id,
             'file_path' => $path,

@@ -33,6 +33,19 @@ class InventoryRequestResource extends Resource
                     ->preload()
                     ->required(),
 
+                Forms\Components\DatePicker::make('pickup_date')
+                    ->label('Pickup Date')
+                    ->required(),
+
+                Forms\Components\Select::make('pickup_location')
+                    ->label('Pickup Location')
+                    ->options([
+                        'Daytona Beach' => '(Region 1) 375 Fentress Blvd, Daytona Beach, FL 32114',
+                        'Melbourne' => '(Region 2) 5101 W Eau Gallie Blvd, Melbourne, FL 32934',
+                        'Fort Pierce' => '(Region 3) 14800 Indrio Rd, Fort Pierce, FL 34945',
+                    ])
+                    ->required(),
+
                 Forms\Components\Textarea::make('notes')
                     ->label('Request Notes')
                     ->columnSpanFull()
@@ -42,11 +55,16 @@ class InventoryRequestResource extends Resource
                     ->relationship()
                     ->schema([
                         Forms\Components\Select::make('inventory_item_id')
-                            ->label('Item')
+                            ->label('Item (System)')
                             ->relationship('item', 'name')
                             ->options(fn () => \App\Models\InventoryItem::pluck('name', 'id'))
                             ->searchable()
-                            ->required(),
+                            ->preload()
+                            ->nullable(),
+                        Forms\Components\TextInput::make('item_name')
+                            ->label('Item Name (Manual)')
+                            ->helperText('For items not yet in system')
+                            ->nullable(),
                         Forms\Components\TextInput::make('quantity_requested')
                             ->label('Quantity')
                             ->numeric()
@@ -54,10 +72,9 @@ class InventoryRequestResource extends Resource
                             ->minValue(1)
                             ->required(),
                     ])
-                    ->columns(2)
+                    ->columns(3)
                     ->columnSpanFull()
-                    ->addActionLabel('Add Item')
-                    ->collapsible(),
+                    ->addActionLabel('Add Item'),
 
                 Forms\Components\Select::make('status')
                     ->options([

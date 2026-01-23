@@ -106,7 +106,8 @@ class InventoryController extends Controller
             foreach ($validated['items'] as $item) {
                 InventoryRequestItem::create([
                     'inventory_request_id' => $inventoryRequest->id,
-                    'inventory_item_id' => $item['item_id'],
+                    'inventory_item_id' => $item['item_id'] ?: null,
+                    'item_name' => $item['name'] ?? null,  // Store the name for items not in system
                     'quantity_requested' => $item['quantity'],
                 ]);
             }

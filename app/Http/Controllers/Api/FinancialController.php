@@ -63,13 +63,13 @@ class FinancialController extends Controller
 
         // Current week earnings from Approved tasks
         $currentWeekEarnings = Task::where('assigned_tech_id', $user->id)
-            ->where('financial_status', TaskFinancialStatus::Approved)
+            ->where('financial_status', TaskFinancialStatus::Billable)
             ->whereBetween('completion_date', [$weekStart, $weekEnd])
             ->sum('tech_price');
 
         // Count of Approved tasks this week
         $tasksCount = Task::where('assigned_tech_id', $user->id)
-            ->where('financial_status', TaskFinancialStatus::Approved)
+            ->where('financial_status', TaskFinancialStatus::Billable)
             ->whereBetween('completion_date', [$weekStart, $weekEnd])
             ->count();
 
